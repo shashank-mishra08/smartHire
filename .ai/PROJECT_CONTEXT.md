@@ -7,7 +7,7 @@ SmartHire
 Build an end-to-end Agentic AI system that automates interview scheduling through natural AI conversation with candidates. The system collects candidate details conversationally, checks recruiter calendar availability, schedules interviews, sends notifications, and maintains records — all without manual intervention.
 
 ## Current Objective
-Project setup and architecture planning
+Security hardening & next-phase features (Notifications, Resume matching)
 
 ## Overall Architecture
 ```
@@ -21,49 +21,44 @@ SmartHire/
 
 ### System Architecture
 ```
-Candidate (Chat UI) → Backend API → AI Agent (Gemini/OpenAI)
+Candidate (Chat UI) → Backend API → AI Agent (Gemini 2.0 Flash)
                                         │
                     ┌───────────────────┼───────────────────┐
                     │                   │                   │
-              Google Calendar    Gmail/Email          MongoDB
+              Google Calendar    Gmail/Email         Firestore
               (Availability)    (Notifications)     (Storage)
-                    │                   │                   │
-              Google Meet        Google Sheets         Slack
-              (Link Gen)         (Logging)          (Notify)
+                    │                                   │
+              Google Meet                            JWT Auth
+              (Link Gen)                          (Recruiter Login)
 ```
 
 ## Tech Stack
 | Layer | Technology | Why |
 |-------|-----------|-----|
 | Frontend | Next.js 14+ (App Router) | SSR, API routes, modern React |
-| UI | Tailwind CSS + shadcn/ui | Rapid premium UI development |
+| UI | Tailwind CSS + Custom Design System | Rapid premium UI development |
 | Backend | Node.js + Express | Fast API development, JS ecosystem |
-| AI/LLM | Google Gemini API | Cost-effective, good reasoning |
-| Database | MongoDB Atlas | Flexible schema, existing cluster |
+| AI/LLM | Google Gemini 2.0 Flash | Cost-effective, good reasoning |
+| Database | Firebase Firestore | Flexible schema, reliable cloud hosting |
 | Calendar | Google Calendar API | Most common, OAuth support |
-| Email | Gmail API / Nodemailer | Direct integration |
-| Sheets | Google Sheets API | Recruiter-friendly logging |
+| Email | Nodemailer (SMTP) | Direct integration |
 | Video | Google Meet | Auto link generation via Calendar |
-| Notifications | Slack Webhooks | Team notifications |
-| Auth | NextAuth.js + Google OAuth | Secure recruiter login |
-| File Storage | Google Drive API | Resume storage |
+| Auth | Google OAuth + JWT Cookies | Secure recruiter login |
 
 ## APIs Used
 - Google Calendar API (scheduling, availability)
 - Gmail API / SMTP (email notifications)
-- Google Sheets API (interview logging)
-- Google Drive API (resume storage)
 - Google Meet (via Calendar API - auto link)
 - Gemini API (AI conversation)
-- Slack Incoming Webhooks (notifications)
+- Firebase Admin SDK (Firestore database)
 
-## Database Schema (MongoDB)
+## Database Schema (Firebase Firestore)
 ### Collections:
 1. **candidates** - name, email, phone, role, resumeUrl, resumeSummary, scores, createdAt
 2. **interviews** - candidateId, recruiterId, date, time, status, meetLink, calendarEventId
-3. **recruiters** - name, email, calendarId, slackId, department
-4. **conversations** - candidateId, messages[], context, status
-5. **jobDescriptions** - title, description, skills[], department, recruiterId
+3. **conversations** - sessionId, messages[], context, status
+4. **settings** - recruiterEmail, googleCalendarConnected, googleTokens
+5. **jobDescriptions** - title, description, skills[], department
 
 ## Environment Variables
 ```
@@ -73,62 +68,57 @@ GEMINI_API_KEY=
 # Google APIs
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=
+GOOGLE_REDIRECT_URI=http://localhost:5001/api/auth/google/callback
+GOOGLE_RECRUITER_EMAIL=
 
-# MongoDB
-MONGODB_URI=mongodb+srv://shashankmishra00026:WhNWbpvZrCSq9bk1@cluster0.og0x7.mongodb.net/SmartHire?retryWrites=true&w=majority
-
-# Slack
-SLACK_WEBHOOK_URL=
+# JWT Auth
+JWT_SECRET=
 
 # App
-NEXTAUTH_SECRET=
-NEXTAUTH_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:3000
 
-# SMTP (fallback)
-SMTP_HOST=
-SMTP_PORT=
+# SMTP (for emails)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
 SMTP_USER=
 SMTP_PASS=
 ```
 
-## Current Working Module
-Google Calendar API integration and OAuth setup.
-
 ## Current Progress
 - [x] Project scaffolding
 - [x] Architecture design
-- [x] Backend API + MongoDB setup
-- [x] AI Chatbot conversation flow (Gemini)
+- [x] Backend API + Firebase Firestore setup
+- [x] AI Chatbot conversation flow (Gemini 2.0 Flash)
 - [x] Premium Frontend UI (Chat + Dashboard)
+- [x] Google Calendar OAuth integration
+- [x] Free slot finder + Interview scheduling
+- [x] Google Meet auto link generation
+- [x] Recruiter Dashboard (stats, interview list, status updates)
+- [x] Google OAuth recruiter authentication (JWT cookies)
+- [x] Dashboard route protection (auth guard)
+- [x] Login page (premium design)
 
 ## Completed Features
 1. **AI Conversation Chatbot**: Built with Gemini 2.0 Flash, state machine handling data collection.
 2. **Premium UI**: Next.js App Router, Tailwind CSS, Glassmorphism, animations.
-3. **Database Integration**: MongoDB models for Candidate, Interview, Conversation.
-4. **Recruiter Dashboard**: Layout, analytics stats, recent interviews list.
+3. **Database Integration**: Firebase Firestore models for Candidate, Interview, Conversation, Settings.
+4. **Recruiter Dashboard**: Layout, analytics stats, recent interviews list, status updates.
+5. **Google Calendar**: OAuth connection, availability check, event creation, Meet links.
+6. **Authentication**: Google OAuth login → JWT cookie → protected dashboard routes.
 
 ## Pending Features
-1. AI Conversation Chatbot (natural language)
-2. Candidate Detail Collection
-3. Google Calendar Integration (availability check)
-4. Interview Scheduling (slot booking)
-5. Google Meet Link Generation
-6. Email Notifications (candidate + recruiter)
-7. Google Sheets Logging
-8. Resume Upload & Storage
-9. Resume AI Summary
-10. JD Matching & Scoring
-11. Auto Question Generation
-12. Candidate Scoring
-13. Interview Reminders
-14. Reschedule/Cancel Flow
-15. Recruiter Dashboard
-16. Analytics (scheduled, pending, completed)
-17. Slack Notifications
+1. Email Notifications (candidate + recruiter confirmation)
+2. Resume Upload & Storage
+3. Resume AI Summary
+4. JD Matching & Scoring
+5. Auto Question Generation
+6. Reschedule/Cancel Flow (Calendar sync)
+7. Interview Reminders
+8. Google Sheets Logging
+9. Slack Notifications
 
 ## Known Issues
-(none yet)
+1. Google OAuth test user needs to be manually added in GCP Console (Testing mode).
 
 ## Future Improvements
 - WhatsApp/SMS notifications via Twilio
@@ -142,6 +132,6 @@ Google Calendar API integration and OAuth setup.
 
 ## Current Status
 
-**What we were doing:** Fixed port conflict (5000 -> 5001) and frontend caching issues. Successfully deployed local development servers for MVP phase 1 and 2.  
-**Where we stopped:** Tasks updated. AI chat interface and Dashboard UI are working locally.  
-**What should be done next:** Wait for the user to add the `GEMINI_API_KEY` to the `.env` file, and then begin Google Calendar API OAuth integration for scheduling.
+**What we were doing:** Added recruiter authentication (Google OAuth + JWT cookies) and protected dashboard behind login. Fixed the critical bug where anyone could access the recruiter dashboard without signing in.
+**Where we stopped:** Auth system complete and verified. Dashboard protected, Login page created. TypeScript compiles cleanly. API returns 401 for unauthenticated requests.
+**What should be done next:** Phase 4 (Email notifications via SMTP/Gmail) and Phase 5 (Resume upload & JD matching).

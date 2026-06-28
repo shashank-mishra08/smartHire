@@ -9,7 +9,10 @@ export const config = {
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   nodeEnv: process.env.NODE_ENV || 'development',
 
-  // MongoDB
+  // JWT Auth
+  jwtSecret: process.env.JWT_SECRET || 'smarthire-dev-secret-key-change-in-production',
+
+  // MongoDB (legacy — now using Firebase Firestore)
   mongodbUri: process.env.MONGODB_URI || '',
 
   // Gemini AI

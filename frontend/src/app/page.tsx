@@ -86,7 +86,7 @@ export default function Home() {
               <span>💬</span> Start Interview Chat
             </Link>
             <Link
-              href="/dashboard"
+              href="/login"
               className="hero-btn"
               style={{
                 background: "transparent",
@@ -95,7 +95,7 @@ export default function Home() {
                 color: "var(--text-primary)",
               }}
             >
-              <span>📊</span> Recruiter Dashboard
+              <span>🔐</span> Recruiter Login
             </Link>
           </div>
         </div>

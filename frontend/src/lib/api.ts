@@ -2,6 +2,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 /**
  * API client for SmartHire backend
+ * All requests include credentials for cookie-based auth
  */
 export const api = {
   /**
@@ -37,49 +38,55 @@ export const api = {
   },
 
   /**
-   * Get dashboard stats
+   * Get dashboard stats (requires auth)
    */
   async getDashboardStats() {
-    const res = await fetch(`${API_BASE}/dashboard/stats`);
+    const res = await fetch(`${API_BASE}/dashboard/stats`, { credentials: 'include' });
+    if (res.status === 401) throw new Error('UNAUTHORIZED');
     return res.json();
   },
 
   /**
-   * Get interviews list
+   * Get interviews list (requires auth)
    */
   async getInterviews(status?: string, page?: number) {
     const params = new URLSearchParams();
     if (status) params.set('status', status);
     if (page) params.set('page', String(page));
-    const res = await fetch(`${API_BASE}/dashboard/interviews?${params}`);
+    const res = await fetch(`${API_BASE}/dashboard/interviews?${params}`, { credentials: 'include' });
+    if (res.status === 401) throw new Error('UNAUTHORIZED');
     return res.json();
   },
 
   /**
-   * Get recent interviews
+   * Get recent interviews (requires auth)
    */
   async getRecentInterviews() {
-    const res = await fetch(`${API_BASE}/dashboard/interviews/recent`);
+    const res = await fetch(`${API_BASE}/dashboard/interviews/recent`, { credentials: 'include' });
+    if (res.status === 401) throw new Error('UNAUTHORIZED');
     return res.json();
   },
 
   /**
-   * Get candidates list
+   * Get candidates list (requires auth)
    */
   async getCandidates() {
-    const res = await fetch(`${API_BASE}/dashboard/candidates`);
+    const res = await fetch(`${API_BASE}/dashboard/candidates`, { credentials: 'include' });
+    if (res.status === 401) throw new Error('UNAUTHORIZED');
     return res.json();
   },
 
   /**
-   * Update interview status
+   * Update interview status (requires auth)
    */
   async updateInterviewStatus(id: string, status: string) {
     const res = await fetch(`${API_BASE}/dashboard/interviews/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ status }),
     });
+    if (res.status === 401) throw new Error('UNAUTHORIZED');
     return res.json();
   },
 
@@ -87,7 +94,27 @@ export const api = {
    * Check Calendar connection status
    */
   async checkCalendarStatus() {
-    const res = await fetch(`${API_BASE}/auth/calendar/status`);
+    const res = await fetch(`${API_BASE}/auth/calendar/status`, { credentials: 'include' });
+    return res.json();
+  },
+
+  /**
+   * Get current logged-in recruiter (auth check)
+   */
+  async getMe() {
+    const res = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' });
+    if (res.status === 401) throw new Error('UNAUTHORIZED');
+    return res.json();
+  },
+
+  /**
+   * Logout
+   */
+  async logout() {
+    const res = await fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    });
     return res.json();
   },
 };

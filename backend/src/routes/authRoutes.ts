@@ -1,15 +1,18 @@
 import { Router } from 'express';
-import { googleLogin, googleCallback, checkCalendarStatus } from '../controllers/authController';
+import { googleLogin, googleCallback, checkCalendarStatus, getMe, logout } from '../controllers/authController';
+import { requireAuth } from '../middleware/authMiddleware';
 
 const router = Router();
 
-// /api/auth/google
+// Public — OAuth flow
 router.get('/google', googleLogin);
-
-// /api/auth/google/callback
 router.get('/google/callback', googleCallback);
 
-// /api/auth/calendar/status
+// Public — calendar status check
 router.get('/calendar/status', checkCalendarStatus);
+
+// Protected — requires login
+router.get('/me', requireAuth, getMe);
+router.post('/logout', logout);
 
 export default router;

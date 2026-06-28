@@ -12,16 +12,12 @@
 **Why:** Same language as frontend (JS/TS), massive ecosystem, easy Google API integration, fast development. Perfect for 1-day MVP timeline.
 **Alternatives considered:** FastAPI (Python) — good but adds language switching overhead.
 
-#### Database: MongoDB Atlas
-**Why:** Flexible schema perfect for conversation logs and varying candidate data. User already has an Atlas cluster. No migration needed.
-**Alternatives considered:** Supabase/Postgres — good but MongoDB's document model fits chat logs better.
-
 #### AI/LLM: Google Gemini API
 **Why:** Cost-effective, good reasoning capability, easy integration, supports function calling for tool use.
 **Alternatives considered:** OpenAI GPT-4 — more expensive, Claude — similar cost.
 
-#### UI: Tailwind CSS + shadcn/ui
-**Why:** Rapid development of premium-looking UI. shadcn/ui gives beautiful, accessible components out of the box.
+#### UI: Tailwind CSS + Custom Design System
+**Why:** Rapid development of premium-looking UI. Custom CSS variables for consistent theming.
 
 ### 2026-06-28: Architecture Pattern
 **Decision:** Monorepo with separate frontend/ and backend/ directories
@@ -37,6 +33,19 @@
 **Decision:** Natural AI conversation, NOT form-based
 **Why:** HR specifically wants "agentic AI jo candidate se baat kare". Form would defeat the purpose. AI should feel like talking to a real recruiter.
 
-### 2026-06-28: MongoDB Database Name
-**Decision:** Using "SmartHire" database on existing Atlas cluster
-**URI:** mongodb+srv://...@cluster0.og0x7.mongodb.net/SmartHire
+### 2026-06-28: Database — Firebase Firestore over MongoDB Atlas
+**Decision:** Migrated from MongoDB Atlas to Firebase Firestore
+**Why:** MongoDB Atlas cluster was consistently failing with `ENOTFOUND` and `buffering timed out` errors. Firebase Firestore provides reliable, serverless, auto-scaling document storage with no connection pool management. Service account auth is simpler than connection strings.
+**Migration approach:** Created Mongoose-compatible wrapper classes (static `find`, `findOne`, `countDocuments`; instance `save()`) so existing service code works without changes.
+
+### 2026-06-28: Authentication — JWT Cookies over Session-Based Auth
+**Decision:** Google OAuth login → JWT stored in httpOnly cookie
+**Why:**
+- Stateless: No server-side session store needed (no Redis/Memcached).
+- Secure: httpOnly cookies can't be accessed by client-side JavaScript (XSS-safe).
+- Simple: Single middleware (`requireAuth`) checks JWT on all protected routes.
+- Existing OAuth: Already had Google OAuth for Calendar — extended to also serve as login.
+**Alternatives considered:**
+- NextAuth.js — adds complexity, separate auth flow from Calendar OAuth.
+- Session-based — requires server-side storage.
+- LocalStorage tokens — vulnerable to XSS.

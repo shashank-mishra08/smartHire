@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 
@@ -29,6 +30,7 @@ interface Interview {
 type TabType = "overview" | "interviews" | "candidates";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [stats, setStats] = useState<Stats>({
     total: 0,
@@ -42,15 +44,29 @@ export default function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [calendarConnected, setCalendarConnected] = useState(true);
+  const [recruiterEmail, setRecruiterEmail] = useState("");
+  const [authChecked, setAuthChecked] = useState(false);
 
+  // 🔒 Auth guard — redirect to login if not authenticated
   useEffect(() => {
-    loadDashboardData();
+    api.getMe()
+      .then((data) => {
+        setRecruiterEmail(data.email || "");
+        setAuthChecked(true);
+        loadDashboardData();
+      })
+      .catch(() => {
+        router.replace("/login");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    loadInterviews();
+    if (authChecked) {
+      loadInterviews();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
+  }, [statusFilter, authChecked]);
 
   const loadDashboardData = async () => {
     setIsLoading(true);
@@ -63,7 +79,11 @@ export default function DashboardPage() {
       setStats(statsData);
       setInterviews(Array.isArray(interviewsData) ? interviewsData : []);
       setCalendarConnected(calendarData.connected);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.message === "UNAUTHORIZED") {
+        router.replace("/login");
+        return;
+      }
       console.error("Dashboard load error:", err);
     }
     setIsLoading(false);
@@ -73,7 +93,11 @@ export default function DashboardPage() {
     try {
       const data = await api.getInterviews(statusFilter);
       setInterviews(data.interviews || []);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.message === "UNAUTHORIZED") {
+        router.replace("/login");
+        return;
+      }
       console.error("Interviews load error:", err);
     }
   };
@@ -82,9 +106,22 @@ export default function DashboardPage() {
     try {
       await api.updateInterviewStatus(id, status);
       loadDashboardData();
-    } catch (err) {
+    } catch (err: any) {
+      if (err.message === "UNAUTHORIZED") {
+        router.replace("/login");
+        return;
+      }
       console.error("Status update error:", err);
     }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch (e) {
+      // ignore
+    }
+    router.replace("/login");
   };
 
   const getStatusBadge = (status: string) => {
@@ -102,6 +139,28 @@ export default function DashboardPage() {
     { id: "interviews" as TabType, icon: "📅", label: "Interviews" },
     { id: "candidates" as TabType, icon: "👥", label: "Candidates" },
   ];
+
+  // Don't render until auth is verified
+  if (!authChecked) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "var(--bg-primary)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--text-muted)",
+          fontSize: "16px",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "32px", marginBottom: "12px" }}>🔒</div>
+          Checking authentication...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-layout">
@@ -159,6 +218,58 @@ export default function DashboardPage() {
             <span style={{ fontSize: "18px" }}>🏠</span>
             Home
           </Link>
+
+          {/* Recruiter info + Logout */}
+          <div
+            style={{
+              marginTop: "16px",
+              padding: "12px 16px",
+              borderRadius: "var(--radius-md)",
+              background: "rgba(99,102,241,0.06)",
+              border: "1px solid rgba(99,102,241,0.12)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "12px",
+                color: "var(--text-muted)",
+                marginBottom: "4px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              🔐 {recruiterEmail}
+            </div>
+            <button
+              onClick={handleLogout}
+              style={{
+                width: "100%",
+                padding: "8px",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--border)",
+                background: "transparent",
+                color: "var(--text-secondary)",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s",
+                fontFamily: "inherit",
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = "rgba(239,68,68,0.1)";
+                e.currentTarget.style.borderColor = "rgba(239,68,68,0.3)";
+                e.currentTarget.style.color = "#f87171";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.borderColor = "var(--border)";
+                e.currentTarget.style.color = "var(--text-secondary)";
+              }}
+            >
+              🚪 Logout
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -219,42 +330,12 @@ export default function DashboardPage() {
             {/* Stats */}
             <div className="stats-grid">
               {[
-                {
-                  label: "Total Interviews",
-                  value: stats.total,
-                  icon: "📋",
-                  color: "#6366f1",
-                },
-                {
-                  label: "Scheduled",
-                  value: stats.scheduled,
-                  icon: "📅",
-                  color: "#3b82f6",
-                },
-                {
-                  label: "Completed",
-                  value: stats.completed,
-                  icon: "✅",
-                  color: "#10b981",
-                },
-                {
-                  label: "Cancelled",
-                  value: stats.cancelled,
-                  icon: "❌",
-                  color: "#ef4444",
-                },
-                {
-                  label: "Candidates",
-                  value: stats.candidates,
-                  icon: "👥",
-                  color: "#8b5cf6",
-                },
-                {
-                  label: "Completion Rate",
-                  value: `${stats.completionRate}%`,
-                  icon: "📊",
-                  color: "#f59e0b",
-                },
+                { label: "Total Interviews", value: stats.total, icon: "📋", color: "#6366f1" },
+                { label: "Scheduled", value: stats.scheduled, icon: "📅", color: "#3b82f6" },
+                { label: "Completed", value: stats.completed, icon: "✅", color: "#10b981" },
+                { label: "Cancelled", value: stats.cancelled, icon: "❌", color: "#ef4444" },
+                { label: "Candidates", value: stats.candidates, icon: "👥", color: "#8b5cf6" },
+                { label: "Completion Rate", value: `${stats.completionRate}%`, icon: "📊", color: "#f59e0b" },
               ].map((stat, i) => (
                 <div key={i} className="stat-card" style={{ animationDelay: `${i * 0.05}s` }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -275,40 +356,16 @@ export default function DashboardPage() {
               </h2>
 
               {isLoading ? (
-                <div
-                  style={{
-                    padding: "60px",
-                    textAlign: "center",
-                    color: "var(--text-muted)",
-                    background: "var(--bg-card)",
-                    borderRadius: "var(--radius-lg)",
-                    border: "1px solid var(--border)",
-                  }}
-                >
+                <div style={{ padding: "60px", textAlign: "center", color: "var(--text-muted)", background: "var(--bg-card)", borderRadius: "var(--radius-lg)", border: "1px solid var(--border)" }}>
                   <div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div>
                   Loading...
                 </div>
               ) : interviews.length === 0 ? (
-                <div
-                  style={{
-                    padding: "60px",
-                    textAlign: "center",
-                    color: "var(--text-muted)",
-                    background: "var(--bg-card)",
-                    borderRadius: "var(--radius-lg)",
-                    border: "1px solid var(--border)",
-                  }}
-                >
+                <div style={{ padding: "60px", textAlign: "center", color: "var(--text-muted)", background: "var(--bg-card)", borderRadius: "var(--radius-lg)", border: "1px solid var(--border)" }}>
                   <div style={{ fontSize: "48px", marginBottom: "16px" }}>📅</div>
-                  <h3 style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "8px" }}>
-                    No interviews yet
-                  </h3>
-                  <p style={{ fontSize: "14px", marginBottom: "24px" }}>
-                    Interviews scheduled through the AI chat will appear here
-                  </p>
-                  <Link href="/chat" className="btn btn-primary" style={{ textDecoration: "none" }}>
-                    💬 Open AI Chat
-                  </Link>
+                  <h3 style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "8px" }}>No interviews yet</h3>
+                  <p style={{ fontSize: "14px", marginBottom: "24px" }}>Interviews scheduled through the AI chat will appear here</p>
+                  <Link href="/chat" className="btn btn-primary" style={{ textDecoration: "none" }}>💬 Open AI Chat</Link>
                 </div>
               ) : (
                 <div style={{ overflowX: "auto" }}>
@@ -330,9 +387,7 @@ export default function DashboardPage() {
                           <td>
                             <div>
                               <div style={{ fontWeight: 600 }}>{interview.candidateName}</div>
-                              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                                {interview.candidateEmail}
-                              </div>
+                              <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>{interview.candidateEmail}</div>
                             </div>
                           </td>
                           <td>{interview.role}</td>
@@ -341,40 +396,15 @@ export default function DashboardPage() {
                           <td>{getStatusBadge(interview.status)}</td>
                           <td>
                             {interview.meetLink ? (
-                              <a
-                                href={interview.meetLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  color: "var(--primary-light)",
-                                  textDecoration: "none",
-                                  fontSize: "13px",
-                                }}
-                              >
-                                🔗 Join
-                              </a>
-                            ) : (
-                              "—"
-                            )}
+                              <a href={interview.meetLink} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary-light)", textDecoration: "none", fontSize: "13px" }}>🔗 Join</a>
+                            ) : "—"}
                           </td>
                           <td>
                             <div style={{ display: "flex", gap: "6px" }}>
                               {interview.status === "scheduled" && (
                                 <>
-                                  <button
-                                    className="btn btn-ghost"
-                                    style={{ padding: "4px 10px", fontSize: "12px" }}
-                                    onClick={() => updateStatus(interview._id, "completed")}
-                                  >
-                                    ✅
-                                  </button>
-                                  <button
-                                    className="btn btn-ghost"
-                                    style={{ padding: "4px 10px", fontSize: "12px" }}
-                                    onClick={() => updateStatus(interview._id, "cancelled")}
-                                  >
-                                    ❌
-                                  </button>
+                                  <button className="btn btn-ghost" style={{ padding: "4px 10px", fontSize: "12px" }} onClick={() => updateStatus(interview._id, "completed")}>✅</button>
+                                  <button className="btn btn-ghost" style={{ padding: "4px 10px", fontSize: "12px" }} onClick={() => updateStatus(interview._id, "cancelled")}>❌</button>
                                 </>
                               )}
                             </div>
@@ -407,42 +437,17 @@ export default function DashboardPage() {
             </div>
 
             {interviews.length === 0 ? (
-              <div
-                style={{
-                  padding: "60px",
-                  textAlign: "center",
-                  color: "var(--text-muted)",
-                  background: "var(--bg-card)",
-                  borderRadius: "var(--radius-lg)",
-                  border: "1px solid var(--border)",
-                }}
-              >
+              <div style={{ padding: "60px", textAlign: "center", color: "var(--text-muted)", background: "var(--bg-card)", borderRadius: "var(--radius-lg)", border: "1px solid var(--border)" }}>
                 <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔍</div>
                 <p>No interviews found with this filter</p>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                 {interviews.map((interview, i) => (
-                  <div
-                    key={interview._id}
-                    className="glass-card"
-                    style={{
-                      padding: "20px 24px",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: "16px",
-                      flexWrap: "wrap",
-                      animationDelay: `${i * 0.05}s`,
-                    }}
-                  >
+                  <div key={interview._id} className="glass-card" style={{ padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", flexWrap: "wrap", animationDelay: `${i * 0.05}s` }}>
                     <div style={{ flex: 1, minWidth: "200px" }}>
-                      <div style={{ fontWeight: 700, fontSize: "16px" }}>
-                        {interview.candidateName}
-                      </div>
-                      <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "4px" }}>
-                        {interview.candidateEmail} • {interview.candidatePhone}
-                      </div>
+                      <div style={{ fontWeight: 700, fontSize: "16px" }}>{interview.candidateName}</div>
+                      <div style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "4px" }}>{interview.candidateEmail} • {interview.candidatePhone}</div>
                     </div>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>Role</div>
@@ -459,24 +464,10 @@ export default function DashboardPage() {
                     <div>{getStatusBadge(interview.status)}</div>
                     <div style={{ display: "flex", gap: "8px" }}>
                       {interview.meetLink && (
-                        <a
-                          href={interview.meetLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn-ghost"
-                          style={{ padding: "6px 12px", fontSize: "12px", textDecoration: "none" }}
-                        >
-                          🔗 Meet
-                        </a>
+                        <a href={interview.meetLink} target="_blank" rel="noopener noreferrer" className="btn btn-ghost" style={{ padding: "6px 12px", fontSize: "12px", textDecoration: "none" }}>🔗 Meet</a>
                       )}
                       {interview.status === "scheduled" && (
-                        <button
-                          className="btn btn-ghost"
-                          style={{ padding: "6px 12px", fontSize: "12px" }}
-                          onClick={() => updateStatus(interview._id, "completed")}
-                        >
-                          ✅ Complete
-                        </button>
+                        <button className="btn btn-ghost" style={{ padding: "6px 12px", fontSize: "12px" }} onClick={() => updateStatus(interview._id, "completed")}>✅ Complete</button>
                       )}
                     </div>
                   </div>
@@ -489,37 +480,11 @@ export default function DashboardPage() {
         {/* ═══════════ CANDIDATES TAB ═══════════ */}
         {activeTab === "candidates" && (
           <div className="animate-fade-in">
-            <div
-              style={{
-                padding: "60px",
-                textAlign: "center",
-                color: "var(--text-muted)",
-                background: "var(--bg-card)",
-                borderRadius: "var(--radius-lg)",
-                border: "1px solid var(--border)",
-              }}
-            >
+            <div style={{ padding: "60px", textAlign: "center", color: "var(--text-muted)", background: "var(--bg-card)", borderRadius: "var(--radius-lg)", border: "1px solid var(--border)" }}>
               <div style={{ fontSize: "48px", marginBottom: "16px" }}>👥</div>
-              <h3
-                style={{
-                  fontSize: "18px",
-                  fontWeight: 700,
-                  color: "var(--text-primary)",
-                  marginBottom: "8px",
-                }}
-              >
-                Candidates
-              </h3>
-              <p style={{ fontSize: "14px", marginBottom: "24px" }}>
-                Candidates who schedule via AI chat will appear here with their details, resume summary, and match scores.
-              </p>
-              <Link
-                href="/chat"
-                className="btn btn-primary"
-                style={{ textDecoration: "none" }}
-              >
-                💬 Schedule First Interview
-              </Link>
+              <h3 style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "8px" }}>Candidates</h3>
+              <p style={{ fontSize: "14px", marginBottom: "24px" }}>Candidates who schedule via AI chat will appear here with their details, resume summary, and match scores.</p>
+              <Link href="/chat" className="btn btn-primary" style={{ textDecoration: "none" }}>💬 Schedule First Interview</Link>
             </div>
           </div>
         )}

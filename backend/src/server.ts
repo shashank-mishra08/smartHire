@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { config } from './config/env';
 import { connectDatabase } from './config/database';
 import chatRoutes from './routes/chatRoutes';
@@ -13,6 +14,7 @@ app.use(cors({
   origin: config.frontendUrl,
   credentials: true,
 }));
+app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -23,8 +25,8 @@ app.use((req, _res, next) => {
 });
 
 // Routes
-app.use('/api/chat', chatRoutes);
-app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/chat', chatRoutes);        // Public — candidates don't login
+app.use('/api/dashboard', dashboardRoutes); // 🔒 Protected — requires JWT
 app.use('/api/auth', authRoutes);
 
 // Health check
@@ -47,7 +49,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 // Start server
 async function start() {
-  // Connect to MongoDB
+  // Connect to Firebase Firestore
   await connectDatabase();
 
   app.listen(config.port, () => {

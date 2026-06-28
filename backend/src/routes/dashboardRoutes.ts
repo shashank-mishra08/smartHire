@@ -6,8 +6,12 @@ import {
   updateInterviewStatus,
   getRecentInterviews,
 } from '../controllers/dashboardController';
+import { requireAuth } from '../middleware/authMiddleware';
 
 const router = Router();
+
+// 🔒 All dashboard routes require authentication
+router.use(requireAuth);
 
 // Dashboard stats
 router.get('/stats', getDashboardStats);
