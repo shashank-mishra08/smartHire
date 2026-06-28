@@ -17,8 +17,18 @@ export async function startChat(req: Request, res: Response): Promise<void> {
 
     const response = await aiAgent.startConversation(sessionId);
     res.json(response);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error starting chat:', error);
+
+    // Check if it's a Gemini rate limit error
+    if (error?.status === 429 || error?.message?.includes('429')) {
+      res.status(429).json({ 
+        error: 'Too Many Requests', 
+        message: 'The AI is currently receiving too many requests (Free Tier Quota Exceeded). Please wait about 30 seconds and try again.'
+      });
+      return;
+    }
+
     res.status(500).json({ error: 'Failed to start conversation' });
   }
 }
@@ -61,8 +71,18 @@ export async function sendMessage(req: Request, res: Response): Promise<void> {
     }
 
     res.json(response);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error processing message:', error);
+    
+    // Check if it's a Gemini rate limit error
+    if (error?.status === 429 || error?.message?.includes('429')) {
+      res.status(429).json({ 
+        error: 'Too Many Requests', 
+        message: 'The AI is currently receiving too many requests (Free Tier Quota Exceeded). Please wait about 30 seconds and try again.'
+      });
+      return;
+    }
+
     res.status(500).json({ error: 'Failed to process message' });
   }
 }

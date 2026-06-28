@@ -52,7 +52,7 @@ async function start() {
   // Connect to Firebase Firestore
   await connectDatabase();
 
-  app.listen(config.port, () => {
+  app.listen(config.port, '0.0.0.0', () => {
     console.log(`
 ╔══════════════════════════════════════════╗
 ║                                          ║

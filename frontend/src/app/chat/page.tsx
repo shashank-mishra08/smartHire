@@ -22,7 +22,12 @@ export default function ChatPage() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesEndRef.current) {
+      const container = messagesEndRef.current.parentElement;
+      if (container) {
+        container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -58,8 +63,7 @@ export default function ChatPage() {
       setMessages([
         {
           role: "assistant",
-          content:
-            "Hi there! 👋 Welcome to SmartHire!\n\nI'm your AI interview scheduling assistant. I'll help you book your interview in just a few minutes.\n\nLet's get started — what's your full name?",
+          content: error?.message || "Hi there! 👋 Welcome to SmartHire!\n\nI'm your AI interview scheduling assistant. I'll help you book your interview in just a few minutes.\n\nLet's get started — what's your full name?",
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -94,13 +98,13 @@ export default function ChatPage() {
       };
       setMessages((prev) => [...prev, aiMsg]);
       setCurrentStage(response.stage);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to send message:", error);
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: "Sorry, I'm having trouble connecting right now. Please make sure the backend server is running on port 5000. 🔄",
+          content: error.message || "Sorry, I'm having trouble connecting right now. Please make sure the backend server is running. 🔄",
           timestamp: new Date().toISOString(),
         },
       ]);

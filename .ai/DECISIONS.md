@@ -30,8 +30,8 @@
 **Tools:** Calendar, Email, Sheets, Resume Parser, Slack, Database
 
 ### 2026-06-28: Conversation Design
-**Decision:** Natural AI conversation, NOT form-based
-**Why:** HR specifically wants "agentic AI jo candidate se baat kare". Form would defeat the purpose. AI should feel like talking to a real recruiter.
+**Decision:** Hybrid RAG Lite approach (State Machine + Gemini Analyzer)
+**Why:** Originally, a pure state machine with hardcoded strings was used for strict ordering (Name -> Role -> Email). However, this failed if a user asked a general question or made a typo. Giving full control to LLM risks losing the structured flow. The Hybrid approach passes user input through a `RAG_SYSTEM_PROMPT` in Gemini to extract data *or* answer questions, while the strict State Machine continues to govern the actual stages.
 
 ### 2026-06-28: Database — Firebase Firestore over MongoDB Atlas
 **Decision:** Migrated from MongoDB Atlas to Firebase Firestore

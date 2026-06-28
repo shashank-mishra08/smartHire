@@ -68,7 +68,7 @@
 }
 
 html {
-  scroll-behavior: smooth;
+  /* Removed scroll-behavior: smooth to prevent Next.js transition bugs and scrollIntoView full-page bouncing */
 }
 
 body {
@@ -78,7 +78,7 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  overflow: hidden; /* Prevent full page scroll bouncing/jumping on desktop and mobile */
 }
 
 /* Custom scrollbar */

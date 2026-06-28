@@ -38,6 +38,24 @@
 **Date Found:** 2026-06-28
 **Date Fixed:** 2026-06-28
 
+### BUG-004: Chat UI Scrolling Out of Bounds
+**Description:** When new messages appeared in the chat, the entire webpage would scroll out of bounds (bouncing), making the chat disappear.
+**Current Status:** Fixed
+**Possible Cause:** `scrollIntoView` was bubbling up to the `<body>` element instead of staying contained within the scrollable chat container.
+**Solution Tried:** Removed `scroll-behavior: smooth` from global CSS.
+**Current Fix:** Used `container.scrollTo()` specifically targeting the `.chat-messages` parent element, and applied `overflow: hidden` to the main body to prevent page-level scrolling.
+**Date Found:** 2026-06-28
+**Date Fixed:** 2026-06-28
+
+### BUG-005: Gemini 429 Too Many Requests (Limit: 0)
+**Description:** The AI Agent would instantly throw a `429` error on the very first message with a brand new API key, preventing any progress.
+**Current Status:** Fixed
+**Possible Cause:** The `gemini-2.0-flash` model has a strict 0-quota free tier limit on certain newly created Google Cloud projects or regions.
+**Solution Tried:** Catching the 429 and surfacing it to the UI.
+**Current Fix:** Upgraded the model from `gemini-1.5-flash` to `gemini-2.5-flash` since the older 1.5 models are returning 404 for this new API key, and 2.0 models are hitting the strict limit 0 quota. Also implemented a fallback day-of-week parser in `understandDate` to prevent the flow from completely blocking if the API is truly down.
+**Date Found:** 2026-06-28
+**Date Fixed:** 2026-06-28
+
 ---
 
 ### Bug Template

@@ -132,6 +132,6 @@ SMTP_PASS=
 
 ## Current Status
 
-**What we were doing:** Added recruiter authentication (Google OAuth + JWT cookies) and protected dashboard behind login. Fixed the critical bug where anyone could access the recruiter dashboard without signing in.
-**Where we stopped:** Auth system complete and verified. Dashboard protected, Login page created. TypeScript compiles cleanly. API returns 401 for unauthenticated requests.
+**What we were doing:** Upgraded the AI chatbot from a rigid state machine to a **Hybrid RAG Lite** system. Fixed critical UI scrolling bugs and Gemini API rate limit / 0-quota issues by safely handling 429 errors and downgrading to the highly reliable `gemini-1.5-flash` model.
+**Where we stopped:** Chatbot now uses `analyzeMessageWithGemini` to parse all inputs flexibly while maintaining strict control of the conversation flow. The chat UI is stable and doesn't bounce.
 **What should be done next:** Phase 4 (Email notifications via SMTP/Gmail) and Phase 5 (Resume upload & JD matching).

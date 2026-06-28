@@ -10,6 +10,7 @@
 
 ### Phase 2 - AI Chatbot
 - [x] AI conversation engine (Gemini 2.0 Flash integration)
+- [x] Refactored to Hybrid RAG Lite system with `gemini-1.5-flash` for flexibility and reliability
 - [x] Candidate detail extraction (name, email, phone, role)
 - [x] Chat UI component (premium design)
 - [x] Conversation state management

@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI, Content } from '@google/generative-ai';
 import { config } from '../config/env';
-import { SYSTEM_PROMPT, RESUME_SUMMARY_PROMPT, JD_MATCHING_PROMPT, QUESTION_GENERATION_PROMPT } from '../utils/prompts';
+import { SYSTEM_PROMPT, RESUME_SUMMARY_PROMPT, JD_MATCHING_PROMPT, QUESTION_GENERATION_PROMPT, RAG_SYSTEM_PROMPT } from '../utils/prompts';
 import { Conversation, IConversation } from '../models/Conversation';
 import { Candidate } from '../models/Candidate';
 import { Interview } from '../models/Interview';
@@ -29,7 +29,7 @@ export class AIAgent {
   private model;
 
   constructor() {
-    this.model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    this.model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
   }
 
   /**
@@ -122,13 +122,14 @@ export class AIAgent {
     switch (stage) {
       case 'greeting':
       case 'collecting_name': {
-        const name = userMessage.trim();
-        if (name.length < 2) {
+        const analysis = await this.analyzeMessageWithGemini(userMessage, 'collecting_name', "The candidate's full name");
+        if (!analysis.hasProvidedData) {
           return {
-            message: `Hmm, that doesn't seem right. Could you tell me your full name please?`,
+            message: analysis.replyMessage || `Hmm, that doesn't seem right. Could you tell me your full name please?`,
             stage: 'collecting_name',
           };
         }
+        const name = analysis.extractedData || userMessage.trim();
         conversation.context.candidateInfo.name = name;
         conversation.context.stage = 'collecting_role';
         return {
@@ -138,13 +139,14 @@ export class AIAgent {
       }
 
       case 'collecting_role': {
-        const role = userMessage.trim();
-        if (role.length < 2) {
+        const analysis = await this.analyzeMessageWithGemini(userMessage, 'collecting_role', "The job role the candidate is applying for");
+        if (!analysis.hasProvidedData) {
           return {
-            message: `Could you specify the role you're applying for? For example: Software Engineer, Data Analyst, Product Manager, etc.`,
+            message: analysis.replyMessage || `Could you specify the role you're applying for? For example: Software Engineer, Data Analyst, etc.`,
             stage: 'collecting_role',
           };
         }
+        const role = analysis.extractedData || userMessage.trim();
         conversation.context.candidateInfo.role = role;
         conversation.context.stage = 'collecting_email';
         return {
@@ -154,13 +156,14 @@ export class AIAgent {
       }
 
       case 'collecting_email': {
-        const email = userMessage.trim().toLowerCase();
-        if (!isValidEmail(email)) {
+        const analysis = await this.analyzeMessageWithGemini(userMessage, 'collecting_email', "The candidate's valid email address");
+        if (!analysis.hasProvidedData || !isValidEmail(analysis.extractedData || '')) {
           return {
-            message: `That doesn't look like a valid email address. Could you double-check and try again?\n\nFor example: yourname@gmail.com`,
+            message: analysis.replyMessage || `That doesn't look like a valid email address. Could you double-check and try again?`,
             stage: 'collecting_email',
           };
         }
+        const email = (analysis.extractedData || userMessage).toLowerCase().trim();
         conversation.context.candidateInfo.email = email;
         conversation.context.stage = 'collecting_phone';
         return {
@@ -170,13 +173,14 @@ export class AIAgent {
       }
 
       case 'collecting_phone': {
-        const phone = userMessage.trim();
-        if (!isValidPhone(phone)) {
+        const analysis = await this.analyzeMessageWithGemini(userMessage, 'collecting_phone', "The candidate's phone number");
+        if (!analysis.hasProvidedData || !isValidPhone(analysis.extractedData || '')) {
           return {
-            message: `Please enter a valid phone number with at least 10 digits.\n\nFor example: 9876543210`,
+            message: analysis.replyMessage || `Please enter a valid phone number with at least 10 digits.`,
             stage: 'collecting_phone',
           };
         }
+        const phone = analysis.extractedData || userMessage.trim();
         conversation.context.candidateInfo.phone = phone;
         conversation.context.stage = 'checking_availability';
         return {
@@ -214,11 +218,22 @@ export class AIAgent {
 
       case 'selecting_slot': {
         const slots = conversation.context.availableSlots || await calendarService.getAvailableSlots(new Date().toDateString());
-        const selectedSlot = this.parseSlotSelection(userMessage, slots);
+        const analysis = await this.analyzeMessageWithGemini(userMessage, 'selecting_slot', `A selected time slot from this list: ${slots.join(', ')}`);
+        
+        let selectedSlot = null;
+        if (analysis.hasProvidedData && analysis.extractedData) {
+            // First check if Gemini extracted the exact time string
+            if (slots.includes(analysis.extractedData)) {
+                selectedSlot = analysis.extractedData;
+            } else {
+                // Fallback to strict parsing in case Gemini returned a weird format
+                selectedSlot = this.parseSlotSelection(analysis.extractedData, slots) || this.parseSlotSelection(userMessage, slots);
+            }
+        }
 
         if (!selectedSlot) {
           return {
-            message: `I didn't catch that. Please pick a slot by number (1-${slots.length}) or tell me the time you prefer.`,
+            message: analysis.replyMessage || `I didn't catch that. Please pick a slot by number (1-${slots.length}) or tell me the time you prefer.`,
             stage: 'selecting_slot',
             slots: slots,
           };
@@ -450,6 +465,37 @@ export class AIAgent {
   }
 
   /**
+   * Use Gemini to analyze a message against the current goal and context (RAG Lite)
+   */
+  private async analyzeMessageWithGemini(userMessage: string, stage: string, targetGoal: string): Promise<{ hasProvidedData: boolean; extractedData: string | null; replyMessage: string | null }> {
+    try {
+      const mockJD = `Company: SmartHire Inc.
+Role details vary, but generally we offer remote-friendly positions, flexible working hours, and competitive salary packages.
+If a candidate asks a general question, be helpful and informative based on standard tech company practices.`;
+
+      const prompt = RAG_SYSTEM_PROMPT
+        .replace('{{CONTEXT}}', mockJD)
+        .replace('{{STAGE}}', stage)
+        .replace('{{TARGET_GOAL}}', targetGoal);
+
+      const result = await this.model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+        systemInstruction: prompt,
+        generationConfig: {
+          responseMimeType: 'application/json',
+        }
+      });
+      
+      const responseText = result.response.text();
+      return JSON.parse(responseText);
+    } catch (error) {
+      console.error('Error in analyzeMessageWithGemini:', error);
+      // Fallback: assume they didn't provide valid data if AI fails
+      return { hasProvidedData: false, extractedData: null, replyMessage: "I'm having trouble processing that right now. Could you please answer the question directly?" };
+    }
+  }
+
+  /**
    * Use AI to understand natural language dates
    */
   private async understandDate(text: string): Promise<string | null> {
@@ -467,17 +513,29 @@ What date are they referring to? Respond with ONLY the date in a human-readable 
         return null;
       }
       return response;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error understanding date:', error);
-      // Fallback to basic parsing
+      if (error?.status === 429 || error?.message?.includes('429')) throw error;
+      // Fallback to basic parsing if Gemini is completely unavailable
       const lower = text.toLowerCase();
+      const d = new Date();
       if (lower.includes('tomorrow')) {
-        const d = new Date();
         d.setDate(d.getDate() + 1);
         return formatDate(d);
       }
       if (lower.includes('today')) {
-        return formatDate(new Date());
+        return formatDate(d);
+      }
+      // Simple day of week fallback
+      const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      for (let i = 0; i < days.length; i++) {
+        if (lower.includes(days[i])) {
+          const todayDay = d.getDay();
+          let diff = i - todayDay;
+          if (diff <= 0) diff += 7; // Next occurrence of that day
+          d.setDate(d.getDate() + diff);
+          return formatDate(d);
+        }
       }
       return null;
     }
@@ -522,8 +580,9 @@ What date are they referring to? Respond with ONLY the date in a human-readable 
       const prompt = RESUME_SUMMARY_PROMPT.replace('{{RESUME_TEXT}}', resumeText);
       const result = await this.model.generateContent(prompt);
       return result.response.text().trim();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error summarizing resume:', error);
+      if (error?.status === 429 || error?.message?.includes('429')) throw error;
       return 'Unable to generate resume summary at this time.';
     }
   }
@@ -546,8 +605,9 @@ What date are they referring to? Respond with ONLY the date in a human-readable 
         return JSON.parse(jsonMatch[0]);
       }
       return { matchScore: 0, matchingSkills: [], missingSkills: [], recommendation: text };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error matching JD:', error);
+      if (error?.status === 429 || error?.message?.includes('429')) throw error;
       return { matchScore: 0, matchingSkills: [], missingSkills: [], recommendation: 'Error' };
     }
   }
@@ -571,8 +631,9 @@ What date are they referring to? Respond with ONLY the date in a human-readable 
         .map((line) => line.replace(/^\d+[.)]\s*/, '').trim());
 
       return questions.length > 0 ? questions : [text];
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating questions:', error);
+      if (error?.status === 429 || error?.message?.includes('429')) throw error;
       return ['Error generating questions'];
     }
   }
