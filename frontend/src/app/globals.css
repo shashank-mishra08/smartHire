@@ -78,6 +78,7 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 /* Custom scrollbar */
@@ -462,6 +463,7 @@ body {
 .main-content {
   margin-left: 260px;
   flex: 1;
+  min-width: 0;
   padding: 32px;
   min-height: 100vh;
 }
@@ -625,6 +627,10 @@ body {
   background: var(--bg-card);
   color: var(--text-primary);
   border-color: var(--border-light);
+}
+
+.menu-btn {
+  display: none;
 }
 
 /* ═══════════════════ INPUT ═══════════════════ */
@@ -800,19 +806,35 @@ body {
 
 /* ═══════════════════ RESPONSIVE ═══════════════════ */
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .sidebar {
-    display: none;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 50;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .menu-btn {
+    display: flex;
   }
 
   .main-content {
     margin-left: 0;
     padding: 16px;
+    width: 100%;
+    max-width: 100vw;
   }
 
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
+  }
+
+  .stat-card {
+    padding: 16px;
   }
 
   .features-grid {
@@ -822,5 +844,13 @@ body {
 
   .message {
     max-width: 92%;
+  }
+
+  .dashboard-title {
+    font-size: 36px !important;
+  }
+
+  .dashboard-header {
+    margin-bottom: 20px !important;
   }
 }

@@ -135,6 +135,6 @@ SMTP_PASS=
 
 ## Current Status
 
-**What we were doing:** Upgraded the AI chatbot from a rigid state machine to a **Hybrid RAG Lite** system. Fixed critical UI scrolling bugs and Gemini API rate limit / 0-quota issues by safely handling 429 errors and downgrading to the highly reliable `gemini-1.5-flash` model.
-**Where we stopped:** Chatbot now uses `analyzeMessageWithGemini` to parse all inputs flexibly while maintaining strict control of the conversation flow. The chat UI is stable and doesn't bounce.
+**What we were doing:** Upgraded the AI chatbot from a rigid state machine to a **Hybrid RAG Lite** system. Fixed critical UI scrolling bugs and Gemini API rate limit / 0-quota issues by safely handling 429 errors and downgrading to the highly reliable `gemini-1.5-flash` model. We also addressed the backend port conflicts (`PORT=5001`), fixed Firestore index errors (500s) on dashboard sorting, and implemented a custom Mobile Desktop-Scaling layout with a collapsible sidebar.
+**Where we stopped:** The Recruiter Dashboard is fully responsive and behaves like a "Desktop Mode" native app on mobile. Chatbot uses `analyzeMessageWithGemini` to parse all inputs flexibly while maintaining strict control of the conversation flow. 
 **What should be done next:** Phase 4 (Email notifications via SMTP/Gmail) and Phase 5 (Resume upload & JD matching).

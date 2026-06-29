@@ -23,6 +23,7 @@
 - Auth guard on dashboard — redirects unauthenticated users to `/login`.
 - Logout button in dashboard sidebar.
 - Recruiter email display in sidebar.
+- Implemented Mobile Desktop Scaling (900px viewport) for Recruiter Dashboard with a collapsible hamburger side panel.
 
 ### Changed
 - **AI Model Upgrade:** Switched `AIAgent` from `gemini-1.5-flash` to `gemini-2.5-flash` due to the older models being deprecated/unavailable for this API key, while 2.0 still hits strict limits.
@@ -37,6 +38,8 @@
 - Changed backend port from 5000 to 5001 to resolve macOS AirTunes conflict.
 - Fixed Next.js Turbopack caching issues (`Failed to open database`) by wiping `.next`.
 - **CRITICAL:** Fixed dashboard being accessible without authentication (BUG-003).
+- **CRITICAL:** Fixed Firebase Firestore 500 Internal Server error on dashboard filters by deploying composite indexes (`status` ASC, `createdAt` DESC).
+- **CRITICAL:** Fixed backend Port Conflict (`api/auth/me` Connection Refused) by aligning `PORT=5001` across root and backend `.env` files.
 
 ### Security
 - Dashboard routes return `401 Unauthorized` for unauthenticated API requests.

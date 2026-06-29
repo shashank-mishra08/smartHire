@@ -61,6 +61,7 @@ export default function DashboardPage() {
   const [calendarConnected, setCalendarConnected] = useState(true);
   const [recruiterEmail, setRecruiterEmail] = useState("");
   const [authChecked, setAuthChecked] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // 🔒 Auth guard — redirect to login if not authenticated
   useEffect(() => {
@@ -181,8 +182,21 @@ export default function DashboardPage() {
 
   return (
     <div className="dashboard-layout">
+      {/* ═══════════ SIDEBAR OVERLAY ═══════════ */}
+      {isSidebarOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.5)",
+            zIndex: 40,
+          }}
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* ═══════════ SIDEBAR ═══════════ */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${isSidebarOpen ? "open" : ""}`}>
         <div className="sidebar-logo">
           <div
             style={{
@@ -294,6 +308,7 @@ export default function DashboardPage() {
       <main className="main-content">
         {/* Header */}
         <div
+          className="dashboard-header"
           style={{
             display: "flex",
             justifyContent: "space-between",
@@ -303,7 +318,14 @@ export default function DashboardPage() {
         >
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <h1 style={{ fontSize: "28px", fontWeight: 800 }}>
+              <button
+                className="btn btn-ghost menu-btn"
+                style={{ padding: "12px", fontSize: "28px", alignItems: "center", justifyContent: "center" }}
+                onClick={() => setIsSidebarOpen(true)}
+              >
+                ☰
+              </button>
+              <h1 className="dashboard-title" style={{ fontWeight: 800 }}>
                 {activeTab === "overview" && "Dashboard Overview"}
                 {activeTab === "interviews" && "All Interviews"}
                 {activeTab === "candidates" && "Candidates"}
@@ -367,7 +389,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Recent Interviews */}
-            <div style={{ marginTop: "8px" }}>
+            <div style={{ marginTop: "32px" }}>
               <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "16px" }}>
                 Recent Interviews
               </h2>

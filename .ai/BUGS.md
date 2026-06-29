@@ -56,6 +56,24 @@
 **Date Found:** 2026-06-28
 **Date Fixed:** 2026-06-28
 
+### BUG-006: Firebase Firestore 500 Error on Dashboard Filters
+**Description:** The dashboard threw a 500 Internal Server Error when trying to fetch interviews filtered by status (e.g. `?status=completed`).
+**Current Status:** Fixed
+**Possible Cause:** Missing composite indexes in Firestore for sorting and filtering (`status` ASC and `createdAt` DESC).
+**Solution Tried:** Created `firestore.indexes.json` and deployed indexes.
+**Current Fix:** Successfully deployed the required composite index to Firebase, allowing the API to filter and sort concurrently.
+**Date Found:** 2026-06-29
+**Date Fixed:** 2026-06-29
+
+### BUG-007: Backend Port Env Mismatch (Connection Refused)
+**Description:** API calls to `/api/auth/me` failed with `ERR_CONNECTION_REFUSED` on port 5001.
+**Current Status:** Fixed
+**Possible Cause:** The root `.env` had `PORT=5001`, but `backend/.env` still had `PORT=5000` (or wasn't synced).
+**Solution Tried:** Manually checked both `.env` files.
+**Current Fix:** Unified `PORT=5001` in both `/.env` and `/backend/.env`. Restarted backend.
+**Date Found:** 2026-06-29
+**Date Fixed:** 2026-06-29
+
 ---
 
 ### Bug Template

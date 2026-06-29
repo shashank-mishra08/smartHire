@@ -1,4 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+
+export const viewport: Viewport = {
+  width: 900,
+};
 import { Inter } from "next/font/google";
 import "./globals.css";
 
