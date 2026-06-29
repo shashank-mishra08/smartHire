@@ -78,7 +78,6 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow: hidden; /* Prevent full page scroll bouncing/jumping on desktop and mobile */
 }
 
 /* Custom scrollbar */
