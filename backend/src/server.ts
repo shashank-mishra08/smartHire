@@ -81,8 +81,8 @@ async function start() {
   });
 }
 
-// Start local server if not running in Firebase Functions (v2 sets FUNCTION_TARGET)
-if (!process.env.FUNCTION_TARGET) {
+// Start local server if not running in Firebase Functions (v2 sets K_SERVICE, v1 sets FUNCTION_TARGET)
+if (!process.env.FUNCTION_TARGET && !process.env.K_SERVICE) {
   start();
 }
 
