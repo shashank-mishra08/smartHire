@@ -218,10 +218,23 @@ export class CalendarService {
 
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
-    // Parse date and time
-    // dateString might be "June 30, 2026", timeString "10:30 AM"
-    // Using string replacement logic for parsing time
-    const startDateTime = new Date(`${dateString} ${timeString}`);
+    // Robustly parse date and time
+    // dateString might be "2026-06-30" or "June 30th" or "June 30, 2026"
+    // timeString might be "10:00" or "10:00 AM"
+    let cleanDate = dateString.replace(/(st|nd|rd|th)/g, '');
+    if (!cleanDate.includes(new Date().getFullYear().toString())) {
+      cleanDate = `${cleanDate}, ${new Date().getFullYear()}`;
+    }
+
+    let startDateTime = new Date(`${cleanDate} ${timeString}`);
+    
+    if (isNaN(startDateTime.getTime())) {
+      // Fallback if the standard parsing fails
+      console.warn(`Failed to parse date normally: ${cleanDate} ${timeString}. Attempting fallback.`);
+      startDateTime = new Date(); // Fallback to current time + 1 day
+      startDateTime.setDate(startDateTime.getDate() + 1);
+    }
+
     const endDateTime = new Date(startDateTime.getTime() + 30 * 60000); // 30 mins later
 
     const event = {

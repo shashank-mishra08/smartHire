@@ -28,7 +28,7 @@ const checkCalendarSlotsDeclaration: FunctionDeclaration = {
     properties: {
       date: {
         type: SchemaType.STRING,
-        description: 'The date for the interview (e.g., "Monday", "July 1").'
+        description: 'The date for the interview. MUST be formatted as YYYY-MM-DD.'
       }
     },
     required: ['date']
@@ -45,8 +45,8 @@ const bookInterviewDeclaration: FunctionDeclaration = {
       role: { type: SchemaType.STRING },
       email: { type: SchemaType.STRING },
       phone: { type: SchemaType.STRING },
-      date: { type: SchemaType.STRING },
-      time: { type: SchemaType.STRING }
+      date: { type: SchemaType.STRING, description: 'MUST be formatted as YYYY-MM-DD.' },
+      time: { type: SchemaType.STRING, description: 'MUST be formatted as HH:mm (24-hour format).' }
     },
     required: ['name', 'role', 'email', 'phone', 'date', 'time']
   }
@@ -67,6 +67,7 @@ If the user provides partial info, acknowledge it and ask for the rest.
 When the user provides a preferred date, call the 'check_calendar_slots' function to check availability and present the options.
 Once you have ALL details (Name, Role, Email, Phone, Date, Time), explicitly ask for confirmation (e.g. "Here are your details... Should I go ahead and schedule?").
 If the user confirms, call the 'book_interview' function.
+After the interview is successfully booked, congratulate them, provide the meeting details, and EXPLICITLY ask them to upload their resume using the attach button below to help us prepare for the interview.
 Do not hallucinate dates or times. The current date is ${new Date().toDateString()}.`
     });
   }
@@ -114,6 +115,11 @@ Do not hallucinate dates or times. The current date is ${new Date().toDateString
 
     // Pop the last message to send it in sendMessage
     const lastMessage = history.pop()!;
+
+    // Gemini API requires the first message in history to be from a 'user'
+    if (history.length > 0 && history[0].role === 'model') {
+      history.unshift({ role: 'user', parts: [{ text: 'Hi' }] });
+    }
 
     const chat = this.model.startChat({ history });
 
