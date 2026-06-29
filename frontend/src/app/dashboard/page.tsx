@@ -336,7 +336,7 @@ export default function DashboardPage() {
                 </span>
               ) : (
                 <a
-                  href={`${process.env.NEXT_PUBLIC_API_URL}/auth/google`}
+                  href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api'}/auth/google`}
                   className="badge badge-cancelled"
                   style={{ padding: "6px 10px", fontSize: "12px", textDecoration: "none", cursor: "pointer", transition: "all 0.2s" }}
                   onMouseOver={(e) => (e.currentTarget.style.opacity = "0.8")}

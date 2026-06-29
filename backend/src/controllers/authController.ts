@@ -39,7 +39,8 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
       { expiresIn: '7d' }
     );
 
-    const isProd = !!process.env.FUNCTION_TARGET;
+    const host = req.get('host') || '';
+    const isProd = !host.includes('localhost');
     res.cookie('smarthire_token', token, {
       httpOnly: true,
       secure: isProd || config.nodeEnv === 'production',
@@ -48,7 +49,8 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
     });
 
     // Redirect back to frontend dashboard
-    res.redirect(`${config.frontendUrl}/dashboard?calendarConnected=true`);
+    const redirectFrontendUrl = isProd ? 'https://smarthire-d9513.web.app' : (config.frontendUrl || 'http://localhost:3000');
+    res.redirect(`${redirectFrontendUrl}/dashboard?calendarConnected=true`);
   } catch (error) {
     console.error('Error handling Google OAuth callback:', error);
     res.redirect(`${config.frontendUrl}/dashboard?calendarError=true`);
@@ -87,7 +89,8 @@ export async function getMe(req: AuthRequest, res: Response): Promise<void> {
  * Logout — clear the session cookie
  */
 export async function logout(req: Request, res: Response): Promise<void> {
-  const isProd = !!process.env.FUNCTION_TARGET;
+  const host = req.get('host') || '';
+  const isProd = !host.includes('localhost');
   res.clearCookie('smarthire_token', {
     httpOnly: true,
     secure: isProd || config.nodeEnv === 'production',
