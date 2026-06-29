@@ -59,7 +59,7 @@ export default function ChatPage() {
         setCurrentStage(response.stage);
       }
       setIsStarted(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to start chat:", error);
       // Fallback offline greeting
       setMessages([

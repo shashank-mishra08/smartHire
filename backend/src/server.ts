@@ -1,4 +1,5 @@
 import express from 'express';
+import { onRequest } from 'firebase-functions/v2/https';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { config } from './config/env';
@@ -6,12 +7,14 @@ import { connectDatabase } from './config/database';
 import chatRoutes from './routes/chatRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 import authRoutes from './routes/authRoutes';
+import uploadRoutes from './routes/uploadRoutes';
 
 const app = express();
 
 // Middleware
+const allowedOrigins = [config.frontendUrl, 'https://smarthire-d9513.web.app'];
 app.use(cors({
-  origin: config.frontendUrl,
+  origin: allowedOrigins,
   credentials: true,
 }));
 app.use(cookieParser());
@@ -28,6 +31,7 @@ app.use((req, _res, next) => {
 app.use('/api/chat', chatRoutes);        // Public — candidates don't login
 app.use('/api/dashboard', dashboardRoutes); // 🔒 Protected — requires JWT
 app.use('/api/auth', authRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -67,4 +71,20 @@ async function start() {
   });
 }
 
-start().catch(console.error);
+// Start local server if not running in Firebase Functions (v2 sets FUNCTION_TARGET)
+if (!process.env.FUNCTION_TARGET) {
+  start();
+}
+
+// Ensure DB is connected before handling Firebase Function requests
+let dbConnected = false;
+app.use(async (req, res, next) => {
+  if (!dbConnected) {
+    await connectDatabase();
+    dbConnected = true;
+  }
+  next();
+});
+
+// Export the Express API as a Firebase Cloud Function
+export const api = onRequest({ region: 'us-central1' }, app);
