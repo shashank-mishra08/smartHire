@@ -39,10 +39,11 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
       { expiresIn: '7d' }
     );
 
+    const isProd = !!process.env.FUNCTION_TARGET;
     res.cookie('smarthire_token', token, {
       httpOnly: true,
-      secure: config.nodeEnv === 'production',
-      sameSite: 'lax',
+      secure: isProd || config.nodeEnv === 'production',
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -86,6 +87,11 @@ export async function getMe(req: AuthRequest, res: Response): Promise<void> {
  * Logout — clear the session cookie
  */
 export async function logout(req: Request, res: Response): Promise<void> {
-  res.clearCookie('smarthire_token');
+  const isProd = !!process.env.FUNCTION_TARGET;
+  res.clearCookie('smarthire_token', {
+    httpOnly: true,
+    secure: isProd || config.nodeEnv === 'production',
+    sameSite: isProd ? 'none' : 'lax',
+  });
   res.json({ success: true, message: 'Logged out successfully' });
 }

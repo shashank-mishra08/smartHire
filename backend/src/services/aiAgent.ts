@@ -53,13 +53,8 @@ const bookInterviewDeclaration: FunctionDeclaration = {
 };
 
 export class AIAgent {
-  private model;
-
-  constructor() {
-    this.model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      tools: [{ functionDeclarations: [checkCalendarSlotsDeclaration, bookInterviewDeclaration] }],
-      systemInstruction: `You are a friendly, conversational AI Interview Scheduler for SmartHire.
+  private getModel(context?: any) {
+    let instruction = `You are a friendly, conversational AI Interview Scheduler for SmartHire.
 Your goal is to collect: Name, Role, Email, Phone, Preferred Date, and Preferred Time.
 Always be polite, conversational, and human-like.
 If the user asks off-topic questions, answer them briefly and naturally, then gently steer the conversation back.
@@ -68,7 +63,20 @@ When the user provides a preferred date, call the 'check_calendar_slots' functio
 Once you have ALL details (Name, Role, Email, Phone, Date, Time), explicitly ask for confirmation (e.g. "Here are your details... Should I go ahead and schedule?").
 If the user confirms, call the 'book_interview' function.
 After the interview is successfully booked, congratulate them, provide the meeting details, and EXPLICITLY ask them to upload their resume using the attach button below to help us prepare for the interview.
-Do not hallucinate dates or times. The current date is ${new Date().toDateString()}.`
+Do not hallucinate dates or times. The current date is ${new Date().toDateString()}.`;
+
+    if (context?.resumeUrl) {
+      instruction = `You are a friendly, conversational AI Interview Scheduler for SmartHire.
+The user has successfully scheduled their interview AND already uploaded their resume.
+Your goal is COMPLETE.
+Do NOT ask for their resume again. Answer any final questions politely and conclude the chat.
+Do not hallucinate dates or times. The current date is ${new Date().toDateString()}.`;
+    }
+
+    return genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      tools: [{ functionDeclarations: [checkCalendarSlotsDeclaration, bookInterviewDeclaration] }],
+      systemInstruction: instruction
     });
   }
 
@@ -121,7 +129,7 @@ Do not hallucinate dates or times. The current date is ${new Date().toDateString
       history.unshift({ role: 'user', parts: [{ text: 'Hi' }] });
     }
 
-    const chat = this.model.startChat({ history });
+    const chat = this.getModel(conversation.context).startChat({ history });
 
     try {
       let result = await chat.sendMessage(lastMessage.parts[0].text!);
@@ -344,7 +352,7 @@ Do not hallucinate dates or times. The current date is ${new Date().toDateString
   async summarizeResume(resumeText: string): Promise<string> {
     try {
       const prompt = RESUME_SUMMARY_PROMPT.replace('{{RESUME_TEXT}}', resumeText);
-      const result = await this.model.generateContent(prompt);
+      const result = await this.getModel().generateContent(prompt);
       return result.response.text().trim();
     } catch (error: any) {
       if (error?.status === 429 || error?.message?.includes('429')) throw error;
@@ -358,7 +366,7 @@ Do not hallucinate dates or times. The current date is ${new Date().toDateString
         .replace('{{JD_TEXT}}', jdText)
         .replace('{{RESUME_TEXT}}', resumeText);
 
-      const result = await this.model.generateContent(prompt);
+      const result = await this.getModel().generateContent(prompt);
       const text = result.response.text().trim();
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) return JSON.parse(jsonMatch[0]);
@@ -377,7 +385,7 @@ Do not hallucinate dates or times. The current date is ${new Date().toDateString
         .replace('{{RESUME_SUMMARY}}', resumeSummary)
         .replace('{{SKILLS}}', skills.join(', '));
 
-      const result = await this.model.generateContent(prompt);
+      const result = await this.getModel().generateContent(prompt);
       const text = result.response.text().trim();
 
       const questions = text.split('\n')
