@@ -460,6 +460,7 @@ export class AIAgent {
     } else {
       // Update existing candidate with resume info if newly provided
       candidate.status = 'scheduled';
+      candidate.leadId = candidate.leadId || leadId;
       if (conversation.context.resumeUrl) candidate.resumeUrl = conversation.context.resumeUrl;
       if (conversation.context.resumeSummary) candidate.resumeSummary = conversation.context.resumeSummary;
       if (conversation.context.matchScore) candidate.matchScore = conversation.context.matchScore;
@@ -714,6 +715,7 @@ What date are they referring to? Respond with ONLY the date in a human-readable 
           suggestedQuestions: questions,
         });
       } else {
+        candidate.leadId = candidate.leadId || leadId;
         candidate.resumeUrl = resumeUrl;
         candidate.resumeSummary = summary;
         candidate.matchScore = matchData.matchScore || 0;
