@@ -27,6 +27,20 @@ interface Interview {
   createdAt: string;
 }
 
+interface CandidateType {
+  _id: string;
+  leadId: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  resumeUrl?: string;
+  resumeSummary?: string;
+  matchScore?: number;
+  suggestedQuestions?: string[];
+  createdAt: string;
+}
+
 type TabType = "overview" | "interviews" | "candidates";
 
 export default function DashboardPage() {
@@ -41,6 +55,7 @@ export default function DashboardPage() {
     completionRate: 0,
   });
   const [interviews, setInterviews] = useState<Interview[]>([]);
+  const [candidatesList, setCandidatesList] = useState<CandidateType[]>([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [calendarConnected, setCalendarConnected] = useState(true);
@@ -71,14 +86,16 @@ export default function DashboardPage() {
   const loadDashboardData = async () => {
     setIsLoading(true);
     try {
-      const [statsData, interviewsData, calendarData] = await Promise.all([
+      const [statsData, interviewsData, calendarData, candidatesData] = await Promise.all([
         api.getDashboardStats(),
         api.getRecentInterviews(),
         api.checkCalendarStatus().catch(() => ({ connected: false })),
+        api.getCandidates().catch(() => []),
       ]);
       setStats(statsData);
       setInterviews(Array.isArray(interviewsData) ? interviewsData : []);
       setCalendarConnected(calendarData.connected);
+      setCandidatesList(Array.isArray(candidatesData) ? candidatesData : []);
     } catch (err: any) {
       if (err.message === "UNAUTHORIZED") {
         router.replace("/login");
@@ -480,12 +497,81 @@ export default function DashboardPage() {
         {/* ═══════════ CANDIDATES TAB ═══════════ */}
         {activeTab === "candidates" && (
           <div className="animate-fade-in">
-            <div style={{ padding: "60px", textAlign: "center", color: "var(--text-muted)", background: "var(--bg-card)", borderRadius: "var(--radius-lg)", border: "1px solid var(--border)" }}>
-              <div style={{ fontSize: "48px", marginBottom: "16px" }}>👥</div>
-              <h3 style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "8px" }}>Candidates</h3>
-              <p style={{ fontSize: "14px", marginBottom: "24px" }}>Candidates who schedule via AI chat will appear here with their details, resume summary, and match scores.</p>
-              <Link href="/chat" className="btn btn-primary" style={{ textDecoration: "none" }}>💬 Schedule First Interview</Link>
-            </div>
+            {candidatesList.length === 0 ? (
+              <div style={{ padding: "60px", textAlign: "center", color: "var(--text-muted)", background: "var(--bg-card)", borderRadius: "var(--radius-lg)", border: "1px solid var(--border)" }}>
+                <div style={{ fontSize: "48px", marginBottom: "16px" }}>👥</div>
+                <h3 style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "8px" }}>Candidates</h3>
+                <p style={{ fontSize: "14px", marginBottom: "24px" }}>Candidates who schedule via AI chat will appear here with their details, resume summary, and match scores.</p>
+                <Link href="/chat" className="btn btn-primary" style={{ textDecoration: "none" }}>💬 Schedule First Interview</Link>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {candidatesList.map((candidate, i) => (
+                  <div key={candidate._id} className="glass-card" style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "16px", animationDelay: `${i * 0.05}s` }}>
+                    {/* Header: Basic Info & Score */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "18px", color: "var(--text-primary)" }}>
+                          {candidate.name}
+                        </div>
+                        <div style={{ fontSize: "14px", color: "var(--text-muted)", marginTop: "4px" }}>
+                          {candidate.email} • {candidate.phone || "No phone"}
+                        </div>
+                        <div style={{ marginTop: "8px", display: "flex", gap: "8px", alignItems: "center" }}>
+                          <span className="badge badge-scheduled">{candidate.role}</span>
+                          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                            ID: <span style={{ fontFamily: "monospace" }}>{candidate.leadId}</span>
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>Match Score</div>
+                        <div style={{ 
+                          fontSize: "24px", 
+                          fontWeight: 800, 
+                          color: candidate.matchScore && candidate.matchScore >= 80 ? "var(--success)" 
+                               : candidate.matchScore && candidate.matchScore >= 50 ? "var(--warning)" : "var(--error)" 
+                        }}>
+                          {candidate.matchScore ? `${candidate.matchScore}%` : "N/A"}
+                        </div>
+                        {candidate.resumeUrl && (
+                          <a href={candidate.resumeUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost" style={{ marginTop: "8px", padding: "4px 10px", fontSize: "12px", textDecoration: "none", display: "inline-block" }}>
+                            📄 View Resume
+                          </a>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* AI Insights Section */}
+                    {(candidate.resumeSummary || (candidate.suggestedQuestions && candidate.suggestedQuestions.length > 0)) && (
+                      <div style={{ borderTop: "1px solid var(--border)", paddingTop: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                        <h4 style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{ fontSize: "16px" }}>✨</span> AI Insights
+                        </h4>
+                        
+                        {candidate.resumeSummary && (
+                          <div style={{ background: "rgba(255,255,255,0.02)", padding: "12px 16px", borderRadius: "8px", fontSize: "13px", lineHeight: 1.6 }}>
+                            <div style={{ fontWeight: 600, marginBottom: "4px", color: "var(--text-muted)" }}>Summary</div>
+                            {candidate.resumeSummary}
+                          </div>
+                        )}
+
+                        {candidate.suggestedQuestions && candidate.suggestedQuestions.length > 0 && (
+                          <div style={{ background: "rgba(255,255,255,0.02)", padding: "12px 16px", borderRadius: "8px", fontSize: "13px", lineHeight: 1.6 }}>
+                            <div style={{ fontWeight: 600, marginBottom: "8px", color: "var(--text-muted)" }}>Suggested Interview Questions</div>
+                            <ul style={{ paddingLeft: "20px", margin: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
+                              {candidate.suggestedQuestions.map((q, idx) => (
+                                <li key={idx}>{q}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>

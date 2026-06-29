@@ -253,6 +253,24 @@ export class AIAgent {
       case 'confirming': {
         const lower = userMessage.toLowerCase().trim();
 
+        // Check if user is asking to update/change their details
+        if (lower.includes('change') || lower.includes('update') || lower.includes('wrong') || lower.includes('mistake') || lower.includes('edit')) {
+          // Send them back to collecting_name but keep existing context so they can update specific fields.
+          // For simplicity, we can just ask them what they want to change, or reset to collecting_name
+          // To be truly flexible without losing state, let's ask them which detail to update.
+          // Wait, the simplest robust way for a state machine is just to drop them to a stage where they can provide it.
+          // But our state machine is linear. Let's send them to `checking_availability` if they want to change time,
+          // or we can just say "Sure, what is your correct name/email/phone?" 
+          // Let's use a quick LLM check or just ask them to restart if we don't have a dynamic update stage, 
+          // OR we can add a simple dynamic update logic using the LLM in the default block.
+          // Let's route them to 'collecting_name' but with a friendly message so they just re-enter details quickly.
+          conversation.context.stage = 'collecting_name';
+          return {
+            message: `Sure, let's fix that. What is your correct full name?`,
+            stage: 'collecting_name',
+          };
+        }
+
         if (lower === 'no' || lower === 'nahi' || lower === 'nope' || lower === 'cancel') {
           conversation.context.stage = 'checking_availability';
           return {
@@ -280,7 +298,7 @@ export class AIAgent {
         }
 
         return {
-          message: `Please confirm — should I schedule the interview? Just say Yes or No.`,
+          message: `Please confirm — should I schedule the interview? Just say Yes or No. (If you need to change your details, just say "change my details")`,
           stage: 'confirming',
         };
       }
@@ -423,14 +441,29 @@ export class AIAgent {
 
     // Create candidate
     let candidate = await Candidate.findOne({ email });
+    const leadId = candidate?.leadId || `LEAD-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+
     if (!candidate) {
       candidate = new Candidate({
+        leadId,
         name: name!,
         email: email!,
         phone: phone!,
         role: role!,
         status: 'scheduled',
+        resumeUrl: conversation.context.resumeUrl,
+        resumeSummary: conversation.context.resumeSummary,
+        matchScore: conversation.context.matchScore,
+        suggestedQuestions: conversation.context.suggestedQuestions,
       });
+      await candidate.save();
+    } else {
+      // Update existing candidate with resume info if newly provided
+      candidate.status = 'scheduled';
+      if (conversation.context.resumeUrl) candidate.resumeUrl = conversation.context.resumeUrl;
+      if (conversation.context.resumeSummary) candidate.resumeSummary = conversation.context.resumeSummary;
+      if (conversation.context.matchScore) candidate.matchScore = conversation.context.matchScore;
+      if (conversation.context.suggestedQuestions) candidate.suggestedQuestions = conversation.context.suggestedQuestions;
       await candidate.save();
     }
 
@@ -488,10 +521,55 @@ If a candidate asks a general question, be helpful and informative based on stan
       
       const responseText = result.response.text();
       return JSON.parse(responseText);
-    } catch (error) {
-      console.error('Error in analyzeMessageWithGemini:', error);
-      // Fallback: assume they didn't provide valid data if AI fails
-      return { hasProvidedData: false, extractedData: null, replyMessage: "I'm having trouble processing that right now. Could you please answer the question directly?" };
+    } catch (error: any) {
+      console.error('Error in analyzeMessageWithGemini:', error.message || error);
+      
+      // Smart Fallback if Gemini hits rate limit (429)
+      const text = userMessage.trim();
+      
+      if (stage === 'collecting_email') {
+        const emailMatch = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
+        if (emailMatch) return { hasProvidedData: true, extractedData: emailMatch[1], replyMessage: null };
+      }
+      
+      if (stage === 'collecting_phone') {
+        // Find continuous digits (at least 10)
+        const phoneMatch = text.replace(/[^0-9]/g, '');
+        if (phoneMatch.length >= 10) return { hasProvidedData: true, extractedData: phoneMatch, replyMessage: null };
+      }
+      
+      if (stage === 'collecting_name' && text.length >= 2 && !text.includes('?')) {
+        // If they say "my name is X", strip it
+        let name = text;
+        const prefixes = ['my name is', 'i am', 'this is'];
+        for (const p of prefixes) {
+          if (name.toLowerCase().startsWith(p)) {
+            name = name.substring(p.length).trim();
+          }
+        }
+        return { hasProvidedData: true, extractedData: name, replyMessage: null };
+      }
+      
+      if (stage === 'collecting_role' && text.length >= 2) {
+        return { hasProvidedData: true, extractedData: text, replyMessage: null };
+      }
+
+      if (stage === 'selecting_slot') {
+        const slotMatch = text.match(/(\d+)/);
+        if (slotMatch) return { hasProvidedData: true, extractedData: slotMatch[1], replyMessage: null };
+      }
+      
+      if (stage === 'confirming') {
+        const lower = text.toLowerCase();
+        if (lower.includes('yes') || lower.includes('y') || lower.includes('ha') || lower.includes('haan')) {
+          return { hasProvidedData: true, extractedData: 'Yes', replyMessage: null };
+        } else if (lower.includes('no') || lower.includes('n') || lower.includes('nahi')) {
+          return { hasProvidedData: true, extractedData: 'No', replyMessage: null };
+        }
+      }
+
+      // Default fallback
+      return { hasProvidedData: false, extractedData: null, replyMessage: "I'm having trouble processing that due to high traffic. Could you please answer with just the exact detail directly?" };
     }
   }
 
@@ -501,7 +579,8 @@ If a candidate asks a general question, be helpful and informative based on stan
   private async understandDate(text: string): Promise<string | null> {
     try {
       const today = new Date();
-      const prompt = `The user said: "${text}"
+      const prompt = `You are a date extraction bot. The user is providing a date for an interview. They might speak in English, Hindi, or Hinglish (e.g. "kal" = tomorrow, "parso" = day after tomorrow, "aaj" = today, "somvaar" = monday).
+User input: "${text}"
 Current date is: ${formatDate(today)} (${today.toISOString().split('T')[0]})
 
 What date are they referring to? Respond with ONLY the date in a human-readable format like "Monday, June 30, 2026". If you can't determine the date, respond with "UNKNOWN".`;
@@ -514,16 +593,15 @@ What date are they referring to? Respond with ONLY the date in a human-readable 
       }
       return response;
     } catch (error: any) {
-      console.error('Error understanding date:', error);
-      if (error?.status === 429 || error?.message?.includes('429')) throw error;
-      // Fallback to basic parsing if Gemini is completely unavailable
+      console.error('Error understanding date:', error.message || error);
+      
       const lower = text.toLowerCase();
       const d = new Date();
-      if (lower.includes('tomorrow')) {
+      if (lower.includes('tomorrow') || lower.includes('kal')) {
         d.setDate(d.getDate() + 1);
         return formatDate(d);
       }
-      if (lower.includes('today')) {
+      if (lower.includes('today') || lower.includes('aaj')) {
         return formatDate(d);
       }
       // Simple day of week fallback
@@ -570,6 +648,80 @@ What date are they referring to? Respond with ONLY the date in a human-readable 
     }
 
     return null;
+  }
+
+  /**
+   * Process and analyze an uploaded resume
+   */
+  async processResume(sessionId: string, resumeText: string, resumeUrl: string): Promise<void> {
+    const conversation = await Conversation.findOne({ sessionId });
+    if (!conversation) throw new Error('Conversation not found');
+
+    const role = conversation.context.candidateInfo?.role || 'the applied role';
+    
+    // AI processing with graceful fallbacks — resume should save even if Gemini quota is exhausted
+    let summary = 'Resume uploaded successfully. AI summary will be available when API quota is restored.';
+    let matchData: any = { matchScore: 0, matchingSkills: [], missingSkills: [] };
+    let questions: string[] = [];
+
+    try {
+      // 1. Summarize
+      summary = await this.summarizeResume(resumeText);
+      
+      // 2. Match JD (Role)
+      matchData = await this.matchJD(role, resumeText);
+      
+      // 3. Generate Questions
+      questions = await this.generateQuestions(role, summary, matchData.matchingSkills || []);
+    } catch (aiError: any) {
+      console.warn('⚠️ AI processing failed (likely quota). Resume still saved.', aiError?.message || aiError);
+    }
+
+    // Save to context (always — even if AI failed)
+    conversation.context.resumeUrl = resumeUrl;
+    conversation.context.resumeSummary = summary;
+    conversation.context.matchScore = matchData.matchScore || 0;
+    conversation.context.suggestedQuestions = questions;
+    
+    // Add AI message acknowledging receipt
+    conversation.messages.push({
+      role: 'assistant',
+      content: questions.length > 0
+        ? `Thanks for uploading your resume! I've analyzed it and prepared personalized interview questions. 📄✨`
+        : `Thanks for uploading your resume! I've saved it. The AI analysis will be available once the API quota is restored. 📄`,
+      timestamp: new Date(),
+    });
+
+    await conversation.save();
+
+    // If email is already collected, save to Candidate collection immediately so it appears on Dashboard
+    const email = conversation.context.candidateInfo?.email;
+    if (email) {
+      let candidate = await Candidate.findOne({ email });
+      const leadId = candidate?.leadId || `LEAD-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+      
+      if (!candidate) {
+        candidate = new Candidate({
+          leadId,
+          name: conversation.context.candidateInfo?.name || 'Unknown',
+          email: email,
+          phone: conversation.context.candidateInfo?.phone || 'Unknown',
+          role: role,
+          status: 'active',
+          resumeUrl: resumeUrl,
+          resumeSummary: summary,
+          matchScore: matchData.matchScore || 0,
+          suggestedQuestions: questions,
+        });
+      } else {
+        candidate.resumeUrl = resumeUrl;
+        candidate.resumeSummary = summary;
+        candidate.matchScore = matchData.matchScore || 0;
+        candidate.suggestedQuestions = questions;
+      }
+      await candidate.save();
+      console.log(`✅ Candidate ${leadId} saved with resume. AI: ${questions.length > 0 ? 'Yes' : 'Pending'}`);
+    }
   }
 
   /**

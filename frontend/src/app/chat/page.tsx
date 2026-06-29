@@ -18,8 +18,10 @@ export default function ChatPage() {
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`);
   const [isStarted, setIsStarted] = useState(false);
   const [currentStage, setCurrentStage] = useState("greeting");
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = useCallback(() => {
     if (messagesEndRef.current) {
@@ -112,6 +114,37 @@ export default function ChatPage() {
 
     setIsLoading(false);
     inputRef.current?.focus();
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== "application/pdf") {
+      alert("Please upload a PDF file.");
+      return;
+    }
+
+    setIsUploading(true);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: `📎 Uploaded Resume: ${file.name}`, timestamp: new Date().toISOString() },
+    ]);
+
+    try {
+      const response = await api.uploadResume(sessionId, file);
+      const lastMsg = response.messages[response.messages.length - 1];
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: lastMsg.content, timestamp: lastMsg.timestamp },
+      ]);
+    } catch (error: any) {
+      console.error("Failed to upload resume:", error);
+      alert("Failed to upload resume.");
+    }
+    
+    setIsUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSlotClick = (slot: string) => {
@@ -350,9 +383,34 @@ export default function ChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={isLoading}
+            disabled={isLoading || isUploading}
             autoFocus
           />
+          <input
+            type="file"
+            accept="application/pdf"
+            ref={fileInputRef}
+            style={{ display: "none" }}
+            onChange={handleFileUpload}
+          />
+          <button
+            className="attach-btn"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading || isUploading}
+            aria-label="Upload Resume"
+            title="Upload Resume (PDF)"
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "18px",
+              padding: "0 10px",
+              color: "var(--text-muted)",
+              transition: "color 0.2s"
+            }}
+          >
+            📎
+          </button>
           <button
             className="send-btn"
             onClick={sendMessage}

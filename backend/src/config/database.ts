@@ -1,5 +1,6 @@
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 import path from 'path';
 
 export async function connectDatabase(): Promise<void> {
@@ -7,6 +8,7 @@ export async function connectDatabase(): Promise<void> {
     const serviceAccountPath = path.resolve(__dirname, '../../service-account.json');
     initializeApp({
       credential: cert(serviceAccountPath),
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET || '',
     });
     console.log('✅ Firebase Admin connected successfully');
   } catch (error) {
@@ -15,3 +17,4 @@ export async function connectDatabase(): Promise<void> {
 }
 
 export const db = getFirestore;
+export const storage = getStorage;

@@ -4,7 +4,7 @@ import { Settings } from '../models/Settings';
 import { v4 as uuidv4 } from 'uuid';
 import { Candidate } from '../models/Candidate';
 
-const oauth2Client = new google.auth.OAuth2(
+export const oauth2Client = new google.auth.OAuth2(
   config.google.clientId,
   config.google.clientSecret,
   config.google.redirectUri
@@ -13,6 +13,9 @@ const oauth2Client = new google.auth.OAuth2(
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
 ];
 
 export class CalendarService {
@@ -30,11 +33,18 @@ export class CalendarService {
   /**
    * Handle OAuth callback and save tokens
    */
-  async handleCallback(code: string): Promise<void> {
+  async handleCallback(code: string): Promise<string> {
     const { tokens } = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(tokens);
+
+    // Fetch user info
+    const oauth2 = google.oauth2({
+      auth: oauth2Client,
+      version: 'v2'
+    });
+    const userInfo = await oauth2.userinfo.get();
+    const email = userInfo.data.email || config.google.recruiterEmail;
     
-    // Save to Settings (assuming single recruiter for MVP)
-    const email = config.google.recruiterEmail;
     await Settings.findOneAndUpdate(
       { recruiterEmail: email },
       {
@@ -50,14 +60,32 @@ export class CalendarService {
       },
       { upsert: true, new: true }
     );
+
+    return email;
+  }
+
+  /**
+   * Returns authenticated client or throws if not connected
+   */
+  async getAuthenticatedClient() {
+    const isConnected = await this.loadTokens();
+    if (!isConnected) {
+      throw new Error('Calendar not connected');
+    }
+    return oauth2Client;
   }
 
   /**
    * Load tokens from DB into oauth2Client
    */
-  private async loadTokens(): Promise<boolean> {
-    const settings = await Settings.findOne({ recruiterEmail: config.google.recruiterEmail });
+  public async loadTokens(): Promise<boolean> {
+    // First try to find by env recruiter email, then fall back to any connected settings
+    let settings = await Settings.findOne({ recruiterEmail: config.google.recruiterEmail });
+    if (!settings || !settings.googleCalendarConnected) {
+      settings = await Settings.findOne({ googleCalendarConnected: true });
+    }
     if (!settings || !settings.googleCalendarConnected || !settings.googleTokens?.refresh_token) {
+      console.log('❌ Google Calendar not connected or missing refresh token');
       return false;
     }
     

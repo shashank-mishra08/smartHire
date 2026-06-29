@@ -46,6 +46,24 @@ export const api = {
   },
 
   /**
+   * Upload resume
+   */
+  async uploadResume(sessionId: string, file: File) {
+    const formData = new FormData();
+    formData.append('resume', file);
+
+    const res = await fetch(`${API_BASE}/chat/${sessionId}/resume`, {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || data.error || 'Failed to upload resume');
+    }
+    return data;
+  },
+
+  /**
    * Get dashboard stats (requires auth)
    */
   async getDashboardStats() {

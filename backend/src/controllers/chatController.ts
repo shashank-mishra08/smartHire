@@ -1,7 +1,11 @@
 import { Request, Response } from 'express';
 import { aiAgent } from '../services/aiAgent';
 import { emailService } from '../services/emailService';
+import { googleSheetsService } from '../services/googleSheetsService';
+import { uploadToFirebase } from '../utils/storage';
 import { config } from '../config/env';
+import pdfParse from 'pdf-parse';
+import { Candidate } from '../models/Candidate';
 
 /**
  * Start a new chat session
@@ -67,6 +71,23 @@ export async function sendMessage(req: Request, res: Response): Promise<void> {
           emailService.sendCandidateConfirmation(emailData),
           emailService.sendRecruiterNotification(emailData),
         ]).catch((err) => console.error('Email error:', err));
+
+        // Get candidate to pass Lead ID and match score
+        Candidate.findOne({ email }).then(candidate => {
+          if (candidate) {
+            googleSheetsService.appendCandidateRow({
+              leadId: candidate.leadId || '',
+              name: candidate.name,
+              role: candidate.role,
+              email: candidate.email,
+              phone: candidate.phone,
+              date: response.interviewDetails!.date,
+              time: response.interviewDetails!.time,
+              meetLink: response.interviewDetails!.meetLink,
+              matchScore: candidate.matchScore || 'N/A'
+            });
+          }
+        }).catch(err => console.error('Sheets error:', err));
       }
     }
 
@@ -107,6 +128,38 @@ export async function getConversation(req: Request, res: Response): Promise<void
     });
   } catch (error) {
     console.error('Error getting conversation:', error);
-    res.status(500).json({ error: 'Failed to get conversation' });
+    res.status(500).json({ error: 'Failed to retrieve conversation' });
+  }
+}
+
+/**
+ * Upload Resume
+ */
+export async function uploadResume(req: Request, res: Response): Promise<void> {
+  try {
+    const sessionId = req.params.sessionId as string;
+    const file = req.file;
+
+    if (!sessionId || !file) {
+      res.status(400).json({ error: 'sessionId and resume file are required' });
+      return;
+    }
+
+    // 1. Upload to Firebase
+    const fileUrl = await uploadToFirebase(file.buffer, file.originalname, file.mimetype);
+
+    // 2. Parse PDF
+    const pdfData = await pdfParse(file.buffer);
+    const text = pdfData.text;
+
+    // 3. Let AI Agent process it
+    await aiAgent.processResume(sessionId, text, fileUrl);
+
+    // 4. Return new conversation state
+    const conversation = await aiAgent.getConversation(sessionId);
+    res.json(conversation);
+  } catch (error: any) {
+    console.error('Error uploading resume:', error);
+    res.status(500).json({ error: 'Failed to upload and process resume' });
   }
 }

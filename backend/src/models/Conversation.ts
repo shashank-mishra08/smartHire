@@ -24,6 +24,10 @@ export interface IConversation {
     selectedTime?: string;
     availableSlots?: string[];
     interviewId?: string;
+    resumeUrl?: string;
+    resumeSummary?: string;
+    matchScore?: number;
+    suggestedQuestions?: string[];
   };
   status: 'active' | 'completed' | 'abandoned';
   createdAt?: Date;
@@ -47,6 +51,10 @@ export class Conversation implements IConversation {
     selectedTime?: string;
     availableSlots?: string[];
     interviewId?: string;
+    resumeUrl?: string;
+    resumeSummary?: string;
+    matchScore?: number;
+    suggestedQuestions?: string[];
   };
   status!: 'active' | 'completed' | 'abandoned';
   createdAt?: Date;

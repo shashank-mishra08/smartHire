@@ -3,6 +3,7 @@ import * as admin from 'firebase-admin';
 
 export interface ICandidate {
   _id?: string;
+  leadId?: string;
   name: string;
   email: string;
   phone: string;
@@ -27,6 +28,7 @@ export interface ICandidate {
 
 export class Candidate implements ICandidate {
   _id?: string;
+  leadId?: string;
   name!: string;
   email!: string;
   phone!: string;
@@ -71,14 +73,21 @@ export class Candidate implements ICandidate {
     const collection = db.collection('candidates');
     this.updatedAt = new Date();
     
+    // Remove undefined fields
+    const dataToSave = Object.fromEntries(Object.entries({ ...this }).filter(([_, v]) => v !== undefined));
+
     if (!this._id) {
       this.createdAt = new Date();
+      dataToSave.createdAt = this.createdAt;
+      
       const docRef = collection.doc();
       this._id = docRef.id;
-      await docRef.set({ ...this });
+      dataToSave._id = this._id;
+      
+      await docRef.set(dataToSave);
     } else {
       const docRef = collection.doc(this._id);
-      await docRef.set({ ...this }, { merge: true });
+      await docRef.set(dataToSave, { merge: true });
     }
     return this;
   }

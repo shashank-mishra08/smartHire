@@ -47,17 +47,17 @@
 ## Pending
 
 ### Phase 4 - Notifications & Logging
-- [ ] Setup valid SMTP for Emails (or Gmail API)
-- [ ] Google Sheets integration (auto-logging)
+- [x] Setup valid SMTP for Emails (Nodemailer setup for Candidate & Recruiter)
+- [x] Google Sheets integration (auto-logging candidate details and Lead IDs)
 - [ ] Slack webhook notification
 
 ### Phase 5 - Resume & Matching
-- [ ] Resume upload endpoint (Multer)
-- [ ] AI resume parsing & summary
-- [ ] Google Drive storage integration
+- [x] Resume upload endpoint (Multer, PDF Parse, Firebase Storage)
+- [x] AI resume parsing & summary
+- [x] Unique Lead ID Generation (Firebase)
 - [ ] JD upload & storage
-- [ ] JD-Resume matching score
-- [ ] Auto interview question generation
+- [x] JD-Resume matching score (using dynamic AI matching based on role)
+- [x] Auto interview question generation
 
 ### Phase 6 - Advanced Features
 - [ ] Reschedule flow (DB + Calendar Sync)
@@ -66,7 +66,7 @@
 - [ ] Candidate scoring system
 
 ### Phase 7b - Recruiter Dashboard (Advanced)
-- [ ] Dedicated Candidates page / list
+- [x] Dedicated Candidates page / list (Added Candidates tab with Lead IDs and Match Scores)
 - [ ] JD management page
 - [ ] Settings page (integrations config)
 

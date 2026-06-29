@@ -24,6 +24,7 @@ export const config = {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     redirectUri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:5001/api/auth/google/callback',
     recruiterEmail: process.env.GOOGLE_RECRUITER_EMAIL || 'contactsuyashgupta@gmail.com',
+    sheetId: process.env.GOOGLE_SHEET_ID || '',
   },
 
   // SMTP

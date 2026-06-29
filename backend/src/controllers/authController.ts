@@ -29,12 +29,12 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Save calendar tokens to Firestore
-    await calendarService.handleCallback(code);
+    // Save calendar tokens to Firestore and get user's email
+    const email = await calendarService.handleCallback(code);
 
     // Issue a JWT session cookie for the recruiter
     const token = jwt.sign(
-      { email: config.google.recruiterEmail },
+      { email: email },
       config.jwtSecret,
       { expiresIn: '7d' }
     );
@@ -59,7 +59,10 @@ export async function googleCallback(req: Request, res: Response): Promise<void>
  */
 export async function checkCalendarStatus(req: Request, res: Response): Promise<void> {
   try {
-    const settings = await Settings.findOne({ recruiterEmail: config.google.recruiterEmail });
+    let settings = await Settings.findOne({ recruiterEmail: config.google.recruiterEmail });
+    if (!settings || !settings.googleCalendarConnected) {
+      settings = await Settings.findOne({ googleCalendarConnected: true });
+    }
     res.json({
       connected: !!(settings && settings.googleCalendarConnected && settings.googleTokens?.refresh_token),
     });

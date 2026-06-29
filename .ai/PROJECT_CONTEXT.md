@@ -25,8 +25,8 @@ Candidate (Chat UI) → Backend API → AI Agent (Gemini 2.0 Flash)
                                         │
                     ┌───────────────────┼───────────────────┐
                     │                   │                   │
-              Google Calendar    Gmail/Email         Firestore
-              (Availability)    (Notifications)     (Storage)
+              Google Calendar    Gmail/Email         Firestore      Google Sheets
+              (Availability)    (Notifications)     (Storage)       (Auto-Logging)
                     │                                   │
               Google Meet                            JWT Auth
               (Link Gen)                          (Recruiter Login)
@@ -40,8 +40,11 @@ Candidate (Chat UI) → Backend API → AI Agent (Gemini 2.0 Flash)
 | Backend | Node.js + Express | Fast API development, JS ecosystem |
 | AI/LLM | Google Gemini 2.0 Flash | Cost-effective, good reasoning |
 | Database | Firebase Firestore | Flexible schema, reliable cloud hosting |
+| Storage | Firebase Storage | Resume PDF storage |
 | Calendar | Google Calendar API | Most common, OAuth support |
+| Sheets | Google Sheets API | Auto-logging candidate info and Lead IDs |
 | Email | Nodemailer (SMTP) | Direct integration |
+| Resume Parsing | pdf-parse | Extract text from uploaded PDFs |
 | Video | Google Meet | Auto link generation via Calendar |
 | Auth | Google OAuth + JWT Cookies | Secure recruiter login |
 
@@ -54,9 +57,9 @@ Candidate (Chat UI) → Backend API → AI Agent (Gemini 2.0 Flash)
 
 ## Database Schema (Firebase Firestore)
 ### Collections:
-1. **candidates** - name, email, phone, role, resumeUrl, resumeSummary, scores, createdAt
-2. **interviews** - candidateId, recruiterId, date, time, status, meetLink, calendarEventId
-3. **conversations** - sessionId, messages[], context, status
+1. **candidates** - leadId, name, email, phone, role, resumeUrl, resumeSummary, matchScore, suggestedQuestions, createdAt
+2. **interviews** - candidateId, recruiterId, candidateName, candidateEmail, date, time, status, meetLink, calendarEventId
+3. **conversations** - sessionId, messages[], context (includes resume parsing data), status
 4. **settings** - recruiterEmail, googleCalendarConnected, googleTokens
 5. **jobDescriptions** - title, description, skills[], department
 

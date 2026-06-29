@@ -53,7 +53,8 @@ export class Interview implements IInterview {
     const collection = db.collection('interviews');
     this.updatedAt = new Date();
     
-    const dataToSave = { ...this };
+    // Remove undefined fields
+    const dataToSave = Object.fromEntries(Object.entries({ ...this }).filter(([_, v]) => v !== undefined));
     
     if (!this._id) {
       this.createdAt = new Date();
