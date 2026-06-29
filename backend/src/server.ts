@@ -11,6 +11,16 @@ import uploadRoutes from './routes/uploadRoutes';
 
 const app = express();
 
+// Ensure DB is connected before handling requests
+let dbConnected = false;
+app.use(async (req, res, next) => {
+  if (!dbConnected) {
+    await connectDatabase();
+    dbConnected = true;
+  }
+  next();
+});
+
 // Middleware
 const allowedOrigins = [config.frontendUrl, 'https://smarthire-d9513.web.app'];
 app.use(cors({
@@ -76,15 +86,5 @@ if (!process.env.FUNCTION_TARGET) {
   start();
 }
 
-// Ensure DB is connected before handling Firebase Function requests
-let dbConnected = false;
-app.use(async (req, res, next) => {
-  if (!dbConnected) {
-    await connectDatabase();
-    dbConnected = true;
-  }
-  next();
-});
-
 // Export the Express API as a Firebase Cloud Function
-export const api = onRequest({ region: 'us-central1' }, app);
+export const api = onRequest({ region: 'us-central1', invoker: 'public' }, app);
