@@ -6,6 +6,7 @@ import { uploadToFirebase } from '../utils/storage';
 import { config } from '../config/env';
 import pdfParse from 'pdf-parse';
 import { Candidate } from '../models/Candidate';
+import Busboy from 'busboy';
 
 /**
  * Start a new chat session
@@ -138,28 +139,61 @@ export async function getConversation(req: Request, res: Response): Promise<void
 export async function uploadResume(req: Request, res: Response): Promise<void> {
   try {
     const sessionId = req.params.sessionId as string;
-    const file = req.file;
 
-    if (!sessionId || !file) {
-      res.status(400).json({ error: 'sessionId and resume file are required' });
+    if (!sessionId) {
+      res.status(400).json({ error: 'sessionId is required' });
       return;
     }
 
-    // 1. Upload to Firebase
-    const fileUrl = await uploadToFirebase(file.buffer, file.originalname, file.mimetype);
+    const busboy = Busboy({ headers: req.headers });
+    let fileBuffer: Buffer | null = null;
+    let fileName = '';
+    let fileMimeType = '';
 
-    // 2. Parse PDF
-    const pdfData = await pdfParse(file.buffer);
-    const text = pdfData.text;
+    busboy.on('file', (name, file, info) => {
+      fileName = info.filename;
+      fileMimeType = info.mimeType;
+      const chunks: Buffer[] = [];
+      file.on('data', (data) => chunks.push(data));
+      file.on('end', () => {
+        fileBuffer = Buffer.concat(chunks);
+      });
+    });
 
-    // 3. Let AI Agent process it
-    await aiAgent.processResume(sessionId, text, fileUrl);
+    busboy.on('finish', async () => {
+      if (!fileBuffer) {
+        res.status(400).json({ error: 'resume file is required' });
+        return;
+      }
 
-    // 4. Return new conversation state
-    const conversation = await aiAgent.getConversation(sessionId);
-    res.json(conversation);
+      try {
+        // 1. Upload to Firebase
+        const fileUrl = await uploadToFirebase(fileBuffer, fileName, fileMimeType);
+
+        // 2. Parse PDF
+        const pdfData = await pdfParse(fileBuffer);
+        const text = pdfData.text;
+
+        // 3. Let AI Agent process it
+        await aiAgent.processResume(sessionId, text, fileUrl);
+
+        // 4. Return new conversation state
+        const conversation = await aiAgent.getConversation(sessionId);
+        res.json(conversation);
+      } catch (error: any) {
+        console.error('Error in busboy finish:', error);
+        res.status(500).json({ error: 'Failed to upload and process resume' });
+      }
+    });
+
+    // In Firebase Functions, req.rawBody is available.
+    if ((req as any).rawBody) {
+      busboy.end((req as any).rawBody);
+    } else {
+      req.pipe(busboy);
+    }
   } catch (error: any) {
     console.error('Error uploading resume:', error);
-    res.status(500).json({ error: 'Failed to upload and process resume' });
+    res.status(500).json({ error: 'Failed to initialize resume upload' });
   }
 }

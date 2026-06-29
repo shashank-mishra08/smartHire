@@ -150,6 +150,13 @@ Do not hallucinate dates or times. The current date is ${new Date().toDateString
         } 
         else if (call.name === 'book_interview') {
           const args = call.args as any;
+          
+          // Convert HH:mm to 12-hour AM/PM for better readability in DB and sheets
+          const tempDate = new Date(`1970-01-01T${args.time.padStart(5, '0')}:00Z`);
+          if (!isNaN(tempDate.getTime())) {
+             args.time = tempDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+          }
+
           const { interviewId, meetLink } = await this.scheduleInterview(conversation, args);
           
           // Send function response back

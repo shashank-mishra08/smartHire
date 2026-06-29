@@ -3,7 +3,7 @@ import { config } from '../config/env';
 import { Settings } from '../models/Settings';
 import { v4 as uuidv4 } from 'uuid';
 import { Candidate } from '../models/Candidate';
-
+import { Interview } from '../models/Interview';
 export const oauth2Client = new google.auth.OAuth2(
   config.google.clientId,
   config.google.clientSecret,
@@ -120,14 +120,14 @@ export class CalendarService {
     if (isNaN(targetDate.getTime())) {
       targetDate.setTime(Date.now()); // Fallback to today
     }
+    
+    // Extract YYYY-MM-DD
+    const dateStr = targetDate.toISOString().split('T')[0];
 
-    // Define working hours for that day in local time (IST = UTC+5:30)
-    // We'll use 10:00 AM to 6:00 PM
-    const startOfDay = new Date(targetDate);
-    startOfDay.setHours(10, 0, 0, 0); // 10:00 AM
-
-    const endOfDay = new Date(targetDate);
-    endOfDay.setHours(18, 0, 0, 0); // 6:00 PM
+    // Define working hours for that day in IST (UTC+5:30)
+    // 10:00 AM to 6:00 PM IST
+    const startOfDay = new Date(`${dateStr}T10:00:00+05:30`);
+    const endOfDay = new Date(`${dateStr}T18:00:00+05:30`);
 
     // Ensure start isn't in the past if it's today
     const now = new Date();
@@ -141,6 +141,8 @@ export class CalendarService {
         const minutes = now.getMinutes();
         now.setMinutes(minutes < 30 ? 30 : 0);
         if (minutes >= 30) now.setHours(now.getHours() + 1);
+        now.setSeconds(0);
+        now.setMilliseconds(0);
         startOfDay.setTime(now.getTime());
       }
     }
@@ -162,6 +164,15 @@ export class CalendarService {
           end: new Date(event.end!.dateTime!),
         }));
 
+      // Fetch booked slots from our database to avoid double-booking
+      const dbInterviews = await Interview.find({ date: dateString });
+      const dbBusySlots: { start: Date; end: Date }[] = dbInterviews.map((interview: any) => ({
+        start: interview.dateTime,
+        end: new Date(interview.dateTime.getTime() + (interview.duration || 30) * 60000)
+      }));
+
+      const allBusySlots = [...busySlots, ...dbBusySlots];
+
       // Generate 30 min blocks
       const freeSlots: string[] = [];
       let current = new Date(startOfDay);
@@ -170,15 +181,16 @@ export class CalendarService {
         const slotEnd = new Date(current.getTime() + 30 * 60000); // +30 mins
 
         // Check if slot overlaps with any busy slot
-        const isBusy = busySlots.some(
+        const isBusy = allBusySlots.some(
           busy => current < busy.end && slotEnd > busy.start
         );
 
         if (!isBusy) {
-          // Format as "HH:MM AM/PM"
+          // Format as "HH:MM AM/PM" enforcing IST
           const timeString = current.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit',
+            timeZone: 'Asia/Kolkata',
           });
           freeSlots.push(timeString);
         }
@@ -226,7 +238,8 @@ export class CalendarService {
       cleanDate = `${cleanDate}, ${new Date().getFullYear()}`;
     }
 
-    let startDateTime = new Date(`${cleanDate} ${timeString}`);
+    // Explicitly enforce IST timezone so 10:00 is not interpreted as UTC
+    let startDateTime = new Date(`${cleanDate} ${timeString} GMT+0530`);
     
     if (isNaN(startDateTime.getTime())) {
       // Fallback if the standard parsing fails
